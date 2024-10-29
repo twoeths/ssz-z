@@ -1,7 +1,7 @@
 const std = @import("std");
-const zh = @import("zero_hash.zig");
-const hashInto = @import("sha256.zig").hashInto;
-const toRootHex = @import("../util.zig").toRootHex;
+const zh = @import("./zero_hash.zig");
+const hashInto = @import("./sha256.zig").hashInto;
+const toRootHex = @import("util").toRootHex;
 
 pub fn merkleizeInto(data: []u8, chunk_count: usize, out: []u8) !void {
     if (chunk_count < 1) {
@@ -98,6 +98,8 @@ test "merkleizeInto" {
         const hex = try toRootHex(output[0..]);
         try std.testing.expectEqualSlices(u8, expected, hex);
     }
+
+    std.debug.print("@@@@ merkleizeInto test passed\n", .{});
 }
 
 fn concatChunks(chunks: []const [32]u8, out: []u8) void {
