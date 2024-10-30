@@ -14,11 +14,14 @@ pub fn createUintType(comptime T: type) type {
         fn hashTreeRoot(self: @This(), value: T) ![]u8 {
             const result = try self.allocator.alloc(u8, 32);
             @memset(result, 0);
-            @This().hashTreeRootInto(value, result);
+            try @This().hashTreeRootInto(value, result);
             return result;
         }
 
-        fn hashTreeRootInto(value: T, out: []u8) void {
+        fn hashTreeRootInto(value: T, out: []u8) !void {
+            if (out.len != 32) {
+                return error.InCorrectLen;
+            }
             const endian_value = if (native_endian == .big) @byteSwap(value) else value;
             const slice = std.mem.bytesAsSlice(T, out);
             slice[0] = endian_value;
