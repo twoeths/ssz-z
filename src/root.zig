@@ -1,6 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 pub const merkleizeInto = @import("hash/merkleize.zig");
+pub const createUintType = @import("type/uint.zig").createUintType;
 
 export fn add(a: i32, b: i32) i32 {
     return a + b;
