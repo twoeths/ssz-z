@@ -11,14 +11,14 @@ pub fn createUintType(comptime T: type) type {
     return struct {
         allocator: *std.mem.Allocator,
         // caller should free the result
-        fn hashTreeRoot(self: @This(), value: T) ![]u8 {
+        pub fn hashTreeRoot(self: @This(), value: T) ![]u8 {
             const result = try self.allocator.alloc(u8, 32);
             @memset(result, 0);
-            try @This().hashTreeRootInto(value, result);
+            try self.hashTreeRootInto(value, result);
             return result;
         }
 
-        fn hashTreeRootInto(value: T, out: []u8) !void {
+        pub fn hashTreeRootInto(_: @This(), value: T, out: []u8) !void {
             if (out.len != 32) {
                 return error.InCorrectLen;
             }
@@ -34,10 +34,10 @@ test "createUintType" {
     const UintType = createUintType(u64);
     const uintType = UintType{ .allocator = &allocator };
     var result = try uintType.hashTreeRoot(0xffffffffffffffff);
-    std.debug.print("uintType.hashTreeRoot(0xffffffffffffffff) {any}\n", .{result});
+    // std.debug.print("uintType.hashTreeRoot(0xffffffffffffffff) {any}\n", .{result});
     allocator.free(result);
     result = try uintType.hashTreeRoot(0xff);
-    std.debug.print("uintType.hashTreeRoot(0xff) {any}\n", .{result});
+    // std.debug.print("uintType.hashTreeRoot(0xff) {any}\n", .{result});
     allocator.free(result);
 }
 

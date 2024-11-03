@@ -29,8 +29,14 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    const hash_module = b.createModule(.{
+        .root_source_file = b.path("src/hash/merkleize.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
 
     lib.root_module.addImport("util", util_module);
+    lib.root_module.addImport("hash", hash_module);
 
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
@@ -50,6 +56,7 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
 
     exe.root_module.addImport("util", util_module);
+    exe.root_module.addImport("hash", hash_module);
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
@@ -83,6 +90,7 @@ pub fn build(b: *std.Build) void {
     });
 
     lib_unit_tests.root_module.addImport("util", util_module);
+    lib_unit_tests.root_module.addImport("hash", hash_module);
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
@@ -93,6 +101,7 @@ pub fn build(b: *std.Build) void {
     });
 
     exe_unit_tests.root_module.addImport("util", util_module);
+    exe_unit_tests.root_module.addImport("hash", hash_module);
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 
