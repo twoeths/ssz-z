@@ -10,16 +10,17 @@ pub fn createContainerType(comptime T: type) type {
     const ContainerType = struct {
         allocator: *std.mem.Allocator,
         ssz_fields: T,
-        chunk_bytes: []u8,
+        // a sha256 block is 64 byte
+        blocks_bytes: []u8,
 
         pub fn init(allocator: *std.mem.Allocator, ssz_fields: T) !@This() {
             // same to round up, looks like a "/" round down
-            const chunk_bytes_len: usize = ((max_chunk_count + 1) / 2) * 64;
-            return @This(){ .allocator = allocator, .ssz_fields = ssz_fields, .chunk_bytes = try allocator.alloc(u8, 32 * chunk_bytes_len) };
+            const blocks_bytes_len: usize = ((max_chunk_count + 1) / 2) * 64;
+            return @This(){ .allocator = allocator, .ssz_fields = ssz_fields, .blocks_bytes = try allocator.alloc(u8, 32 * blocks_bytes_len) };
         }
 
         pub fn deinit(self: @This()) void {
-            self.allocator.free(self.chunk_bytes);
+            self.allocator.free(self.blocks_bytes);
         }
 
         // caller should free the result
@@ -46,10 +47,10 @@ pub fn createContainerType(comptime T: type) type {
                 const field_name = field_info.name;
                 const field_value = @field(value, field_name);
                 const ssz_type = @field(self.ssz_fields, field_name);
-                try ssz_type.hashTreeRootInto(field_value, self.chunk_bytes[(i * 32) .. (i + 1) * 32]);
+                try ssz_type.hashTreeRootInto(field_value, self.blocks_bytes[(i * 32) .. (i + 1) * 32]);
             }
 
-            const result = try merkleizeInto(self.chunk_bytes, max_chunk_count, out);
+            const result = try merkleizeInto(self.blocks_bytes, max_chunk_count, out);
             return result;
         }
     };
