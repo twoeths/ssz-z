@@ -3,27 +3,40 @@ const expect = std.testing.expect;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 
-pub fn createUintType(comptime T: type) type {
-    if (@alignOf(T) > 32) {
-        @compileError("T must have an alignment of 32 bytes or less");
+pub fn createUintType(comptime num_bytes: usize) type {
+    if (num_bytes != 2 and num_bytes != 4 and num_bytes != 8) {
+        @compileError("Only support num_bytes of 2, 4 or 8 bytes");
     }
+
+    const T = switch (num_bytes) {
+        2 => u16,
+        4 => u32,
+        8 => u64,
+        else => unreachable,
+    };
 
     return struct {
         allocator: *std.mem.Allocator,
         // caller should free the result
-        pub fn hashTreeRoot(self: @This(), value: T) ![]u8 {
+        pub fn hashTreeRoot(self: @This(), value: anytype) ![]u8 {
             const result = try self.allocator.alloc(u8, 32);
             @memset(result, 0);
             try self.hashTreeRootInto(value, result);
             return result;
         }
 
-        pub fn hashTreeRootInto(_: @This(), value: T, out: []u8) !void {
-            if (out.len != 32) {
+        pub fn hashTreeRootInto(_: @This(), value: anytype, out: []u8) !void {
+            if (out.len < num_bytes) {
                 return error.InCorrectLen;
             }
-            const endian_value = if (native_endian == .big) @byteSwap(value) else value;
+
+            const value_type = @TypeOf(value);
+            if (value_type != T) {
+                @compileError("value type is not correct");
+            }
+
             const slice = std.mem.bytesAsSlice(T, out);
+            const endian_value = if (native_endian == .big) @byteSwap(value) else value;
             slice[0] = endian_value;
         }
     };
@@ -31,12 +44,14 @@ pub fn createUintType(comptime T: type) type {
 
 test "createUintType" {
     var allocator = std.testing.allocator;
-    const UintType = createUintType(u64);
+    const UintType = createUintType(8);
     const uintType = UintType{ .allocator = &allocator };
-    var result = try uintType.hashTreeRoot(0xffffffffffffffff);
+    var value: u64 = 0xffffffffffffffff;
+    var result = try uintType.hashTreeRoot(value);
     // std.debug.print("uintType.hashTreeRoot(0xffffffffffffffff) {any}\n", .{result});
     allocator.free(result);
-    result = try uintType.hashTreeRoot(0xff);
+    value = 0xff;
+    result = try uintType.hashTreeRoot(value);
     // std.debug.print("uintType.hashTreeRoot(0xff) {any}\n", .{result});
     allocator.free(result);
 }

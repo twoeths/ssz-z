@@ -60,7 +60,7 @@ pub fn createContainerType(comptime T: type) type {
 
 test "createContainerType" {
     var allocator = std.testing.allocator;
-    const UintType = @import("./uint.zig").createUintType(u64);
+    const UintType = @import("./uint.zig").createUintType(8);
     const uintType = UintType{ .allocator = &allocator };
     const SszType = struct {
         x: UintType,
