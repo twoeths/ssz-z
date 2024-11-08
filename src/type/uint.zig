@@ -17,6 +17,16 @@ pub fn createUintType(comptime num_bytes: usize) type {
 
     return struct {
         allocator: *std.mem.Allocator,
+        fixed_size: ?usize,
+
+        pub fn init(allocator: *std.mem.Allocator) !@This() {
+            return @This(){ .allocator = allocator, .fixed_size = num_bytes };
+        }
+
+        pub fn deinit() void {
+            // do nothing
+        }
+
         // caller should free the result
         pub fn hashTreeRoot(self: @This(), value: anytype) ![]u8 {
             const result = try self.allocator.alloc(u8, 32);
@@ -39,13 +49,19 @@ pub fn createUintType(comptime num_bytes: usize) type {
             const endian_value = if (native_endian == .big) @byteSwap(value) else value;
             slice[0] = endian_value;
         }
+
+        pub fn serializeToBytes(self: @This(), value: anytype, out: []u8) !usize {
+            try self.hashTreeRootInto(value, out);
+            return num_bytes;
+        }
     };
 }
 
 test "createUintType" {
     var allocator = std.testing.allocator;
     const UintType = createUintType(8);
-    const uintType = UintType{ .allocator = &allocator };
+    const uintType = try UintType.init(&allocator);
+    // defer uintType.deinit();
     var value: u64 = 0xffffffffffffffff;
     var result = try uintType.hashTreeRoot(value);
     // std.debug.print("uintType.hashTreeRoot(0xffffffffffffffff) {any}\n", .{result});
