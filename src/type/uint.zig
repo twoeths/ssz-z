@@ -54,6 +54,17 @@ pub fn createUintType(comptime num_bytes: usize) type {
             try self.hashTreeRootInto(value, out);
             return num_bytes;
         }
+
+        pub fn deserializeFromBytes(_: @This(), bytes: []u8) !T {
+            if (bytes.len < num_bytes) {
+                return error.InCorrectLen;
+            }
+
+            const slice = std.mem.bytesAsSlice(T, bytes);
+            const value = slice[0];
+            const endian_value = if (native_endian == .big) @byteSwap(value) else value;
+            return endian_value;
+        }
     };
 }
 
