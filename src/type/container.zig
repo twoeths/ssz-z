@@ -142,55 +142,39 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type) type {
             // max_chunk_count is known at compile time so we can allocate on stack
             var field_ranges = [_]BytesRange{.{ .start = 0, .end = 0 }} ** max_chunk_count;
             try self.getFieldRanges(data, field_ranges[0..]);
-            const obj_ptr = try self.allocator.create(ZT);
+            const value_ptr = try self.allocator.create(ZT);
             inline for (ssz_fields_info, 0..) |field_info, i| {
                 const field_name = field_info.name;
                 const ssz_type = @field(self.ssz_fields, field_name);
                 const field_range = field_ranges[i];
                 const field_data = data[field_range.start..field_range.end];
                 const field_value = try ssz_type.deserializeFromBytes(field_data);
-                @field(obj_ptr, field_name) = field_value;
+                @field(value_ptr, field_name) = field_value;
             }
 
-            return obj_ptr;
+            return value_ptr;
         }
+
+        // private functions
 
         fn getFieldRanges(self: @This(), data: []const u8, out: []BytesRange) !void {
             if (out.len != max_chunk_count) {
                 return error.InCorrectLen;
             }
 
-            var fixed_index: usize = 0;
-
-            // TODO: refactor like in readVariableOffsets
             // avoid alloc as much as possible, add 1 at the end for data length
             var offsets = [_]u32{0} ** (max_chunk_count + 1);
-            var offset_index: usize = 0;
-            inline for (ssz_fields_info) |field_info| {
-                const field_name = field_info.name;
-                const ssz_type = @field(self.ssz_fields, field_name);
-                if (ssz_type.fixed_size == null) {
-                    const slice = std.mem.bytesAsSlice(u32, data[fixed_index..(fixed_index + 4)]);
-                    const variable_index_endian = if (native_endian == .big) @byteSwap(slice[0]) else slice[0];
-                    offsets[offset_index] = variable_index_endian;
-                    offset_index += 1;
-                    fixed_index += 4;
-                } else {
-                    fixed_index += ssz_type.fixed_size.?;
-                }
-            }
-            // allocate 1 more for the end of the last variable field so that each variable field can consume 2 offsets
-            offsets[offset_index] = @intCast(data.len);
+            self.readVariableOffsets(data, offsets[0..]);
 
-            // TODO: deduplicate with the loop above
-            offset_index = 0;
-            fixed_index = 0;
+            var variable_index: usize = 0;
+            var fixed_index: usize = 0;
             inline for (ssz_fields_info, 0..) |field_info, i| {
                 const field_name = field_info.name;
                 const ssz_type = @field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
-                    out[i].start = offsets[offset_index];
-                    out[i].end = offsets[offset_index + 1];
+                    out[i].start = offsets[variable_index];
+                    out[i].end = offsets[variable_index + 1];
+                    variable_index += 1;
                     fixed_index += 4;
                 } else {
                     out[i].start = fixed_index;
@@ -198,6 +182,26 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type) type {
                     fixed_index += ssz_type.fixed_size.?;
                 }
             }
+        }
+
+        fn readVariableOffsets(self: @This(), data: []const u8, offsets: []u32) void {
+            var variable_index: usize = 0;
+            var fixed_index: usize = 0;
+            inline for (ssz_fields_info) |field_info| {
+                const field_name = field_info.name;
+                const ssz_type = @field(self.ssz_fields, field_name);
+                if (ssz_type.fixed_size == null) {
+                    const slice = std.mem.bytesAsSlice(u32, data[fixed_index..(fixed_index + 4)]);
+                    const variable_index_endian = if (native_endian == .big) @byteSwap(slice[0]) else slice[0];
+                    offsets[variable_index] = variable_index_endian;
+                    variable_index += 1;
+                    fixed_index += 4;
+                } else {
+                    fixed_index += ssz_type.fixed_size.?;
+                }
+            }
+            // set 1 more at the end of the last variable field so that each variable field can consume 2 offsets
+            offsets[variable_index] = @intCast(data.len);
         }
     };
 
