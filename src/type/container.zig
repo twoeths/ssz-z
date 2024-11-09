@@ -117,7 +117,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type) type {
             var fixed_index: usize = 0;
             var variable_index = self.fixed_end;
 
-            for (ssz_fields_info) |field_info| {
+            inline for (ssz_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const field_value = @field(value, field_name);
                 const ssz_type = @field(self.ssz_fields, field_name);
@@ -125,7 +125,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type) type {
                     // write offset
                     const slice = std.mem.bytesAsSlice(u32, out[fixed_index..]);
                     const variable_index_endian = if (native_endian == .big) @byteSwap(variable_index) else variable_index;
-                    slice[0] = variable_index_endian;
+                    slice[0] = @intCast(variable_index_endian);
                     fixed_index += 4;
                     variable_index = try ssz_type.serializeToBytes(field_value, out[variable_index..]);
                 } else {
@@ -225,9 +225,9 @@ test "createContainerType" {
     const size = containerType.serializeSize(obj);
     // 2 uint64 = 2 * 8 = 16 bytes
     try expect(size == 16);
-    // const bytes = try allocator.alloc(u8, size);
-    // defer allocator.free(bytes);
-    // try containerType.serializeToBytes(obj, bytes);
+    const bytes = try allocator.alloc(u8, size);
+    defer allocator.free(bytes);
+    _ = try containerType.serializeToBytes(obj, bytes);
     // const obj2 = try containerType.deserializeFromBytes(bytes);
     // std.debug.print("containerType.deserializeFromBytes(containerType.serializeToBytes(0xffffffffffffffff)) {any}\n", .{obj2});
 
