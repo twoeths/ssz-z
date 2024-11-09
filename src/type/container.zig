@@ -137,12 +137,12 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type) type {
         }
 
         // consumer should free the result
-        pub fn deserializeFromBytes(self: @This(), data: []const u8) !ZT {
+        pub fn deserializeFromBytes(self: @This(), data: []const u8) !*ZT {
             // TODO: validate data length
             // max_chunk_count is known at compile time so we can allocate on stack
-            const field_ranges = [_]BytesRange{.{ .start = 0, .end = 0 }} ** max_chunk_count;
-            try self.getFieldRanges(data, field_ranges);
-            const obj_ptr = self.allocator.alloc(ZT);
+            var field_ranges = [_]BytesRange{.{ .start = 0, .end = 0 }} ** max_chunk_count;
+            try self.getFieldRanges(data, field_ranges[0..]);
+            const obj_ptr = try self.allocator.create(ZT);
             inline for (ssz_fields_info, 0..) |field_info, i| {
                 const field_name = field_info.name;
                 const ssz_type = @field(self.ssz_fields, field_name);
@@ -151,6 +151,8 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type) type {
                 const field_value = try ssz_type.deserializeFromBytes(field_data);
                 @field(obj_ptr, field_name) = field_value;
             }
+
+            return obj_ptr;
         }
 
         fn getFieldRanges(self: @This(), data: []const u8, out: []BytesRange) !void {
@@ -158,12 +160,12 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type) type {
                 return error.InCorrectLen;
             }
 
-            var fixed_index = 0;
+            var fixed_index: usize = 0;
 
             // TODO: refactor like in readVariableOffsets
-            // allocate 1 more for the end of the last variable field so that each variable field can consume 2 offsets
-            var offsets: [self.variable_field_count + 1]u32 = [_]u32{0} ** (self.variable_field_count + 1);
-            var offset_index = 0;
+            // avoid alloc as much as possible, add 1 at the end for data length
+            var offsets = [_]u32{0} ** (max_chunk_count + 1);
+            var offset_index: usize = 0;
             inline for (ssz_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const ssz_type = @field(self.ssz_fields, field_name);
@@ -177,7 +179,8 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type) type {
                     fixed_index += ssz_type.fixed_size.?;
                 }
             }
-            offsets[offset_index] = data.len;
+            // allocate 1 more for the end of the last variable field so that each variable field can consume 2 offsets
+            offsets[offset_index] = @intCast(data.len);
 
             // TODO: deduplicate with the loop above
             offset_index = 0;
@@ -186,10 +189,12 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type) type {
                 const field_name = field_info.name;
                 const ssz_type = @field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
-                    out[i] = .ByteRange{ .start = offsets[offset_index], .end = offsets[offset_index + 1] };
+                    out[i].start = offsets[offset_index];
+                    out[i].end = offsets[offset_index + 1];
                     fixed_index += 4;
                 } else {
-                    out[i] = .ByteRange{ .start = fixed_index, .end = fixed_index + ssz_type.fixed_size.? };
+                    out[i].start = fixed_index;
+                    out[i].end = fixed_index + ssz_type.fixed_size.?;
                     fixed_index += ssz_type.fixed_size.?;
                 }
             }
@@ -228,8 +233,11 @@ test "createContainerType" {
     const bytes = try allocator.alloc(u8, size);
     defer allocator.free(bytes);
     _ = try containerType.serializeToBytes(obj, bytes);
-    // const obj2 = try containerType.deserializeFromBytes(bytes);
-    // std.debug.print("containerType.deserializeFromBytes(containerType.serializeToBytes(0xffffffffffffffff)) {any}\n", .{obj2});
+    const obj2 = try containerType.deserializeFromBytes(bytes);
+    defer allocator.destroy(obj2);
+    // TODO: implement equal method
+    try expect(obj2.x == obj.x);
+    try expect(obj2.y == obj.y);
 
     containerType.deinit();
 }

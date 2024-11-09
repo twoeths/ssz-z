@@ -62,7 +62,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
             return num_bytes;
         }
 
-        pub fn deserializeFromBytes(_: @This(), bytes: []u8) !T {
+        pub fn deserializeFromBytes(_: @This(), bytes: []const u8) !T {
             if (bytes.len < num_bytes) {
                 return error.InCorrectLen;
             }
