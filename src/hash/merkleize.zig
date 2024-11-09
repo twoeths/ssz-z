@@ -1,9 +1,12 @@
 const std = @import("std");
 const zh = @import("./zero_hash.zig");
-const hashInto = @import("./sha256.zig").hashInto;
+pub const sha256Hash = @import("./sha256.zig").sha256Hash;
+const HashError = @import("./sha256.zig").HashError;
 const toRootHex = @import("util").toRootHex;
 
-pub fn merkleizeInto(data: []u8, chunk_count: usize, out: []u8) !void {
+pub const HashFn = *const fn (in: []const u8, out: []u8) HashError!void;
+
+pub fn merkleizeInto(hashFn: HashFn, data: []u8, chunk_count: usize, out: []u8) !void {
     if (chunk_count < 1) {
         return error.InvalidInput;
     }
@@ -37,7 +40,7 @@ pub fn merkleizeInto(data: []u8, chunk_count: usize, out: []u8) !void {
 
     for (0..layer_count) |i| {
         const buffer_out = data[0..output_len];
-        try hashInto(buffer_in, buffer_out);
+        try hashFn(buffer_in, buffer_out);
         const layer_chunk_count = buffer_out.len / 32;
         if (layer_chunk_count % 2 == 1 and i < layer_count - 1) {
             // extend to 1 more chunk
@@ -94,7 +97,7 @@ test "merkleizeInto" {
         concatChunks(chunks, &all_data);
 
         var output: [32]u8 = undefined;
-        try merkleizeInto(all_data[0..], chunk_count, output[0..]);
+        try merkleizeInto(sha256Hash, all_data[0..], chunk_count, output[0..]);
         const hex = try toRootHex(output[0..]);
         try std.testing.expectEqualSlices(u8, expected, hex);
     }

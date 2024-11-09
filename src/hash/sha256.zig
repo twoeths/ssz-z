@@ -14,7 +14,11 @@ pub fn digest64Into(obj1: []const u8, obj2: []const u8, out: *[32]u8) void {
     Sha256.hash(&buf, out, Options{});
 }
 
-pub fn hashInto(in: []const u8, out: []u8) !void {
+pub const HashError = error{
+    InvalidInput,
+};
+
+pub fn sha256Hash(in: []const u8, out: []u8) HashError!void {
     if (in.len % 64 != 0) {
         return error.InvalidInput;
     }
@@ -47,7 +51,7 @@ test "digest64Into works correctly" {
 test "hashInto" {
     const in = [_]u8{1} ** 128;
     var out: [64]u8 = undefined;
-    try hashInto(&in, &out);
+    try sha256Hash(&in, &out);
     // std.debug.print("@@@ out: {any}\n", .{out});
     var out2: [32]u8 = undefined;
     digest64Into(in[0..32], in[32..64], &out2);

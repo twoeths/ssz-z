@@ -1,6 +1,8 @@
 const std = @import("std");
 const expect = std.testing.expect;
 const merkleizeInto = @import("hash").merkleizeInto;
+const HashFn = @import("hash").HashFn;
+const sha256Hash = @import("hash").sha256Hash;
 
 const BytesRange = struct {
     start: usize,
@@ -9,7 +11,7 @@ const BytesRange = struct {
 
 // create a ssz type from type of an ssz object
 // type of zig type will be used once and checked inside hashTreeRoot() function
-pub fn createContainerType(comptime ST: type, comptime ZT: type) type {
+pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn) type {
     const ssz_fields_info = @typeInfo(ST).Struct.fields;
     const max_chunk_count = ssz_fields_info.len;
     const native_endian = @import("builtin").target.cpu.arch.endian();
@@ -86,7 +88,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type) type {
                 try ssz_type.hashTreeRootInto(field_value, self.blocks_bytes[(i * 32) .. (i + 1) * 32]);
             }
 
-            const result = try merkleizeInto(self.blocks_bytes, max_chunk_count, out);
+            const result = try merkleizeInto(hashFn, self.blocks_bytes, max_chunk_count, out);
             return result;
         }
 
@@ -220,7 +222,7 @@ test "createContainerType" {
         x: u64,
         y: u64,
     };
-    const ContainerType = createContainerType(SszType, ZigType);
+    const ContainerType = createContainerType(SszType, ZigType, sha256Hash);
     const containerType = try ContainerType.init(&allocator, SszType{
         .x = uintType,
         .y = uintType,
@@ -245,7 +247,3 @@ test "createContainerType" {
 
     containerType.deinit();
 }
-
-// createContainerType with different number of fields will cause compile error: Number of fields is not the same
-// createContainerType with different field name will cause compile error: no field named 'y' in struct 'container.test.createContainerType.ZigType'
-// createContainerType with same field name but different type will cause compile error: error: expected type 'u64', found 'bool'
