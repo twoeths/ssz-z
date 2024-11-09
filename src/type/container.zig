@@ -1,4 +1,5 @@
 const std = @import("std");
+const expect = std.testing.expect;
 const merkleizeInto = @import("hash").merkleizeInto;
 
 const BytesRange = struct {
@@ -97,7 +98,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type) type {
         // [field1 offset][field2 data       ][field1 data               ]
         // [0x000000c]    [0xaabbaabbaabbaabb][0xffffffffffffffffffffffff]
         pub fn serializeSize(self: @This(), value: ZT) usize {
-            var size = 0;
+            var size: usize = 0;
             inline for (ssz_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const field_value = @field(value, field_name);
@@ -113,10 +114,10 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type) type {
         }
 
         pub fn serializeToBytes(self: @This(), value: ZT, out: []u8) !usize {
-            var fixed_index = 0;
+            var fixed_index: usize = 0;
             var variable_index = self.fixed_end;
 
-            inline for (ssz_fields_info) |field_info| {
+            for (ssz_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const field_value = @field(value, field_name);
                 const ssz_type = @field(self.ssz_fields, field_name);
@@ -220,6 +221,15 @@ test "createContainerType" {
     const result = try containerType.hashTreeRoot(obj);
     std.debug.print("containerType.hashTreeRoot(0xffffffffffffffff) {any}\n", .{result});
     allocator.free(result);
+
+    const size = containerType.serializeSize(obj);
+    // 2 uint64 = 2 * 8 = 16 bytes
+    try expect(size == 16);
+    // const bytes = try allocator.alloc(u8, size);
+    // defer allocator.free(bytes);
+    // try containerType.serializeToBytes(obj, bytes);
+    // const obj2 = try containerType.deserializeFromBytes(bytes);
+    // std.debug.print("containerType.deserializeFromBytes(containerType.serializeToBytes(0xffffffffffffffff)) {any}\n", .{obj2});
 
     containerType.deinit();
 }
