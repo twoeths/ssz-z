@@ -89,6 +89,29 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type) type {
             return result;
         }
 
+        // Serialization + deserialization
+        // -------------------------------
+        // Containers can mix fixed length and variable length data.
+        //
+        // Fixed part                         Variable part
+        // [field1 offset][field2 data       ][field1 data               ]
+        // [0x000000c]    [0xaabbaabbaabbaabb][0xffffffffffffffffffffffff]
+        pub fn serializeSize(self: @This(), value: ZT) usize {
+            var size = 0;
+            inline for (ssz_fields_info) |field_info| {
+                const field_name = field_info.name;
+                const field_value = @field(value, field_name);
+                const ssz_type = @field(self.ssz_fields, field_name);
+                if (ssz_type.fixed_size == null) {
+                    size += 4;
+                    size += ssz_type.serializeSize(field_value);
+                } else {
+                    size += ssz_type.fixed_size.?;
+                }
+            }
+            return size;
+        }
+
         pub fn serializeToBytes(self: @This(), value: ZT, out: []u8) !usize {
             var fixed_index = 0;
             var variable_index = self.fixed_end;

@@ -50,6 +50,13 @@ pub fn createUintType(comptime num_bytes: usize) type {
             slice[0] = endian_value;
         }
 
+        // Serialization + deserialization
+
+        // unused param but want to follow the same interface as other types
+        pub fn serializeSize(_: @This(), _: T) usize {
+            return num_bytes;
+        }
+
         pub fn serializeToBytes(self: @This(), value: anytype, out: []u8) !usize {
             try self.hashTreeRootInto(value, out);
             return num_bytes;
