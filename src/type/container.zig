@@ -1,6 +1,6 @@
 const std = @import("std");
 const expect = std.testing.expect;
-const merkleizeInto = @import("hash").merkleizeInto;
+const merkleize = @import("hash").merkleizeBlocksBytes;
 const HashFn = @import("hash").HashFn;
 const sha256Hash = @import("hash").sha256Hash;
 
@@ -88,7 +88,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 try ssz_type.hashTreeRootInto(field_value, self.blocks_bytes[(i * 32) .. (i + 1) * 32]);
             }
 
-            const result = try merkleizeInto(hashFn, self.blocks_bytes, max_chunk_count, out);
+            const result = try merkleize(hashFn, self.blocks_bytes, max_chunk_count, out);
             return result;
         }
 

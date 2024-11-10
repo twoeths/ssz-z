@@ -6,7 +6,7 @@ const toRootHex = @import("util").toRootHex;
 
 pub const HashFn = *const fn (in: []const u8, out: []u8) HashError!void;
 
-pub fn merkleizeInto(hashFn: HashFn, data: []u8, chunk_count: usize, out: []u8) !void {
+pub fn merkleizeBlocksBytes(hashFn: HashFn, data: []u8, chunk_count: usize, out: []u8) !void {
     if (chunk_count < 1) {
         return error.InvalidInput;
     }
@@ -57,7 +57,7 @@ pub fn merkleizeInto(hashFn: HashFn, data: []u8, chunk_count: usize, out: []u8) 
     std.mem.copyForwards(u8, out, buffer_in[0..32]);
 }
 
-test "merkleizeInto" {
+test "merkleizeBlocksBytes" {
     var allocator = std.testing.allocator;
     try zh.initZeroHash(&allocator, 10);
     defer zh.deinitZeroHash();
@@ -97,12 +97,12 @@ test "merkleizeInto" {
         concatChunks(chunks, &all_data);
 
         var output: [32]u8 = undefined;
-        try merkleizeInto(sha256Hash, all_data[0..], chunk_count, output[0..]);
+        try merkleizeBlocksBytes(sha256Hash, all_data[0..], chunk_count, output[0..]);
         const hex = try toRootHex(output[0..]);
         try std.testing.expectEqualSlices(u8, expected, hex);
     }
 
-    std.debug.print("@@@@ merkleizeInto test passed\n", .{});
+    std.debug.print("@@@@ merkleizeBlocksBytes test passed\n", .{});
 }
 
 fn concatChunks(chunks: []const [32]u8, out: []u8) void {

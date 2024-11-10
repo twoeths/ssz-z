@@ -1,7 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 // TODO: file exists in multiple modules
-// pub const merkleizeInto = @import("hash/merkleize.zig");
+// pub const merkleizeBlocksBytes = @import("hash/merkleize.zig");
 pub const createUintType = @import("type/uint.zig").createUintType;
 pub const createContainerType = @import("type/container.zig").createContainerType;
 
