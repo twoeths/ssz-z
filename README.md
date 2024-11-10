@@ -1,5 +1,10 @@
 # ssz-z
-An implementation of Ethereum Consensus Spec SimpleSerialize
+An implementation of Ethereum Consensus Spec SimpleSerialize https://github.com/ethereum/consensus-specs/tree/dev/ssz. This follows Typescript implementation of Lodestar team https://github.com/ChainSafe/ssz. Some features:
+- support generic. If you have an application struct, just write a respective ssz struct and create a ssz type then you have an ssz implementation. More on that in the example below.
+- designed to support batch hash through `merkleize` function
+- support generic `HashFn` as a parameter when creating a new type
+
+## Examples
 
 ## Commands:
 - `zig build test` to run all tests
