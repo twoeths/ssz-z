@@ -159,6 +159,10 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
 
         // private functions
 
+        // Deserializer helper: Returns the bytes ranges of all fields, both variable and fixed size.
+        // Fields may not be contiguous in the serialized bytes, so the returned ranges are [start, end].
+        // - For fixed size fields re-uses the pre-computed values this.fieldRangesFixedLen
+        // - For variable size fields does a first pass over the fixed section to read offsets
         fn getFieldRanges(self: @This(), data: []const u8, out: []BytesRange) !void {
             if (out.len != max_chunk_count) {
                 return error.InCorrectLen;
@@ -186,6 +190,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             }
         }
 
+        // Returns the byte ranges of all variable size fields.
         fn readVariableOffsets(self: @This(), data: []const u8, offsets: []u32) void {
             var variable_index: usize = 0;
             var fixed_index: usize = 0;
