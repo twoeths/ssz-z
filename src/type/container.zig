@@ -157,6 +157,19 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return value_ptr;
         }
 
+        pub fn equals(self: @This(), a: *const ZT, b: *const ZT) bool {
+            inline for (ssz_fields_info) |field_info| {
+                const field_name = field_info.name;
+                const ssz_type = @field(self.ssz_fields, field_name);
+                const a_field = @field(a, field_name);
+                const b_field = @field(b, field_name);
+                if (!ssz_type.equals(&a_field, &b_field)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         // private functions
 
         // Deserializer helper: Returns the bytes ranges of all fields, both variable and fixed size.
@@ -246,9 +259,9 @@ test "createContainerType" {
     _ = try containerType.serializeToBytes(obj, bytes);
     const obj2 = try containerType.deserializeFromBytes(bytes);
     defer allocator.destroy(obj2);
-    // TODO: implement equal method
     try expect(obj2.x == obj.x);
     try expect(obj2.y == obj.y);
+    try expect(containerType.equals(&obj, obj2));
 
     containerType.deinit();
 }

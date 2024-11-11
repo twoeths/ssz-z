@@ -72,6 +72,10 @@ pub fn createUintType(comptime num_bytes: usize) type {
             const endian_value = if (native_endian == .big) @byteSwap(value) else value;
             return endian_value;
         }
+
+        pub fn equals(_: @This(), a: *const T, b: *const T) bool {
+            return a.* == b.*;
+        }
     };
 }
 
