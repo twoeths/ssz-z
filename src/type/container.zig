@@ -170,6 +170,19 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return true;
         }
 
+        // consumer should free the result
+        pub fn clone(self: @This(), value: *const ZT) !*ZT {
+            const result_ptr = try self.allocator.create(ZT);
+            inline for (ssz_fields_info) |field_info| {
+                const field_name = field_info.name;
+                const ssz_type = @field(self.ssz_fields, field_name);
+                const field_value = @field(value, field_name);
+                const field_value_clone = try ssz_type.clone(field_value);
+                @field(result_ptr, field_name) = field_value_clone;
+            }
+
+            return result_ptr;
+        }
         // private functions
 
         // Deserializer helper: Returns the bytes ranges of all fields, both variable and fixed size.
@@ -262,6 +275,13 @@ test "createContainerType" {
     try expect(obj2.x == obj.x);
     try expect(obj2.y == obj.y);
     try expect(containerType.equals(&obj, obj2));
+
+    // clone
+    const obj3 = try containerType.clone(&obj);
+    defer allocator.destroy(obj3);
+    try expect(containerType.equals(&obj, obj3));
+    try expect(obj3.x == obj.x);
+    try expect(obj3.y == obj.y);
 
     containerType.deinit();
 }

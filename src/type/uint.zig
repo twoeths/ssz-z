@@ -76,6 +76,15 @@ pub fn createUintType(comptime num_bytes: usize) type {
         pub fn equals(_: @This(), a: *const T, b: *const T) bool {
             return a.* == b.*;
         }
+
+        pub fn clone(_: @This(), value: T) !T {
+            if (value < 0) {
+                return error.InvalidInput;
+            }
+            // const cloned_value = value.*;
+            // return &cloned_value;
+            return value;
+        }
     };
 }
 
