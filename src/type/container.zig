@@ -12,8 +12,8 @@ const BytesRange = struct {
 // create a ssz type from type of an ssz object
 // type of zig type will be used once and checked inside hashTreeRoot() function
 pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn) type {
-    const ssz_fields_info = @typeInfo(ST).Struct.fields;
-    const max_chunk_count = ssz_fields_info.len;
+    const zig_fields_info = @typeInfo(ZT).Struct.fields;
+    const max_chunk_count = zig_fields_info.len;
     const native_endian = @import("builtin").target.cpu.arch.endian();
 
     const ContainerType = struct {
@@ -29,7 +29,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             var fixed_size: ?usize = 0;
             var fixed_end: usize = 0;
             var variable_field_count: usize = 0;
-            inline for (ssz_fields_info) |field_info| {
+            inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const ssz_type = @field(ssz_fields, field_name);
                 const field_fixed_size = ssz_type.fixed_size;
@@ -81,7 +81,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             }
 
             // this will also enforce all fields in value match ssz_fields
-            inline for (ssz_fields_info, 0..) |field_info, i| {
+            inline for (zig_fields_info, 0..) |field_info, i| {
                 const field_name = field_info.name;
                 const field_value = @field(value, field_name);
                 const ssz_type = @field(self.ssz_fields, field_name);
@@ -101,7 +101,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         // [0x000000c]    [0xaabbaabbaabbaabb][0xffffffffffffffffffffffff]
         pub fn serializeSize(self: @This(), value: ZT) usize {
             var size: usize = 0;
-            inline for (ssz_fields_info) |field_info| {
+            inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const field_value = @field(value, field_name);
                 const ssz_type = @field(self.ssz_fields, field_name);
@@ -119,7 +119,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             var fixed_index: usize = 0;
             var variable_index = self.fixed_end;
 
-            inline for (ssz_fields_info) |field_info| {
+            inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const field_value = @field(value, field_name);
                 const ssz_type = @field(self.ssz_fields, field_name);
@@ -139,26 +139,25 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         }
 
         // consumer should free the result
-        pub fn deserializeFromBytes(self: @This(), data: []const u8) !*ZT {
+        pub fn deserializeFromBytes(self: @This(), data: []const u8, out: *ZT) !void {
             // TODO: validate data length
             // max_chunk_count is known at compile time so we can allocate on stack
             var field_ranges = [_]BytesRange{.{ .start = 0, .end = 0 }} ** max_chunk_count;
             try self.getFieldRanges(data, field_ranges[0..]);
-            const value_ptr = try self.allocator.create(ZT);
-            inline for (ssz_fields_info, 0..) |field_info, i| {
+            inline for (zig_fields_info, 0..) |field_info, i| {
                 const field_name = field_info.name;
                 const ssz_type = @field(self.ssz_fields, field_name);
                 const field_range = field_ranges[i];
                 const field_data = data[field_range.start..field_range.end];
-                const field_value = try ssz_type.deserializeFromBytes(field_data);
-                @field(value_ptr, field_name) = field_value;
+                var field_value: field_info.type = undefined;
+                try ssz_type.deserializeFromBytes(field_data, &field_value);
+                // TODO: avoid this copy?
+                @field(out, field_name) = field_value;
             }
-
-            return value_ptr;
         }
 
         pub fn equals(self: @This(), a: *const ZT, b: *const ZT) bool {
-            inline for (ssz_fields_info) |field_info| {
+            inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const ssz_type = @field(self.ssz_fields, field_name);
                 const a_field = @field(a, field_name);
@@ -173,7 +172,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         // consumer should free the result
         pub fn clone(self: @This(), value: *const ZT) !*ZT {
             const result_ptr = try self.allocator.create(ZT);
-            inline for (ssz_fields_info) |field_info| {
+            inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const ssz_type = @field(self.ssz_fields, field_name);
                 const field_value = @field(value, field_name);
@@ -200,7 +199,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
 
             var variable_index: usize = 0;
             var fixed_index: usize = 0;
-            inline for (ssz_fields_info, 0..) |field_info, i| {
+            inline for (zig_fields_info, 0..) |field_info, i| {
                 const field_name = field_info.name;
                 const ssz_type = @field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
@@ -220,7 +219,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         fn readVariableOffsets(self: @This(), data: []const u8, offsets: []u32) void {
             var variable_index: usize = 0;
             var fixed_index: usize = 0;
-            inline for (ssz_fields_info) |field_info| {
+            inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const ssz_type = @field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
@@ -241,7 +240,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
     return ContainerType;
 }
 
-test "createContainerType" {
+test "basic ContainerType {x: uint, y:uint}" {
     var allocator = std.testing.allocator;
     const UintType = @import("./uint.zig").createUintType(8);
     const uintType = try UintType.init(&allocator);
@@ -270,11 +269,11 @@ test "createContainerType" {
     const bytes = try allocator.alloc(u8, size);
     defer allocator.free(bytes);
     _ = try containerType.serializeToBytes(obj, bytes);
-    const obj2 = try containerType.deserializeFromBytes(bytes);
-    defer allocator.destroy(obj2);
+    var obj2: ZigType = undefined;
+    _ = try containerType.deserializeFromBytes(bytes, &obj2);
     try expect(obj2.x == obj.x);
     try expect(obj2.y == obj.y);
-    try expect(containerType.equals(&obj, obj2));
+    try expect(containerType.equals(&obj, &obj2));
 
     // clone
     const obj3 = try containerType.clone(&obj);
@@ -284,4 +283,57 @@ test "createContainerType" {
     try expect(obj3.y == obj.y);
 
     containerType.deinit();
+}
+
+test "ContainerType with embedded struct" {
+    var allocator = std.testing.allocator;
+    const UintType = @import("./uint.zig").createUintType(8);
+    const uintType = try UintType.init(&allocator);
+    defer UintType.deinit();
+    const SszType0 = struct {
+        x: UintType,
+        y: UintType,
+    };
+    const ZigType0 = struct {
+        x: u64,
+        y: u64,
+    };
+    const ContainerType0 = createContainerType(SszType0, ZigType0, sha256Hash);
+    const containerType0 = try ContainerType0.init(&allocator, SszType0{
+        .x = uintType,
+        .y = uintType,
+    });
+    defer containerType0.deinit();
+
+    const SszType1 = struct {
+        a: ContainerType0,
+        b: ContainerType0,
+    };
+    const ZigType1 = struct {
+        a: ZigType0,
+        b: ZigType0,
+    };
+    const ContainerType1 = createContainerType(SszType1, ZigType1, sha256Hash);
+    const containerType1 = try ContainerType1.init(&allocator, SszType1{
+        .a = containerType0,
+        .b = containerType0,
+    });
+    defer containerType1.deinit();
+
+    const a = ZigType0{ .x = 0xffffffffffffffff, .y = 0 };
+    const b = ZigType0{ .x = 0, .y = 0xffffffffffffffff };
+    const obj = ZigType1{ .a = a, .b = b };
+    const size = containerType1.serializeSize(obj);
+    // a = 2 * 8 bytes, b = 2 * 8 bytes
+    try expect(size == 32);
+    const bytes = try allocator.alloc(u8, size);
+    defer allocator.free(bytes);
+    _ = try containerType1.serializeToBytes(obj, bytes);
+    var obj2: ZigType1 = undefined;
+    _ = try containerType1.deserializeFromBytes(bytes, &obj2);
+    try expect(obj2.a.x == a.x);
+    try expect(obj2.a.y == a.y);
+    try expect(obj2.b.x == b.x);
+    try expect(obj2.b.y == b.y);
+    try expect(containerType1.equals(&obj, &obj2));
 }

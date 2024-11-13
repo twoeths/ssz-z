@@ -62,15 +62,17 @@ pub fn createUintType(comptime num_bytes: usize) type {
             return num_bytes;
         }
 
-        pub fn deserializeFromBytes(_: @This(), bytes: []const u8) !T {
+        pub fn deserializeFromBytes(_: @This(), bytes: []const u8, out: *T) !void {
             if (bytes.len < num_bytes) {
                 return error.InCorrectLen;
             }
 
             const slice = std.mem.bytesAsSlice(T, bytes);
+            // TODO: is this the same memory?
             const value = slice[0];
+            // use var to make the compiler happy
             const endian_value = if (native_endian == .big) @byteSwap(value) else value;
-            return endian_value;
+            out.* = endian_value;
         }
 
         pub fn equals(_: @This(), a: *const T, b: *const T) bool {
