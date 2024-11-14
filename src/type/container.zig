@@ -61,12 +61,12 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             self.allocator.free(self.blocks_bytes);
         }
 
-        pub fn hashTreeRoot(self: @This(), value: ZT, out: []u8) !void {
+        pub fn hashTreeRoot(self: @This(), value: *const ZT, out: []u8) !void {
             if (out.len != 32) {
                 return error.InCorrectLen;
             }
 
-            const ValueType = @typeInfo(@TypeOf(value));
+            const ValueType = @typeInfo(@TypeOf(value.*));
             if (ValueType.Struct.fields.len != max_chunk_count) {
                 // TODO: more info to error message
                 @compileError("Number of fields is not the same");
@@ -77,7 +77,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 const field_name = field_info.name;
                 const field_value = @field(value, field_name);
                 const ssz_type = @field(self.ssz_fields, field_name);
-                try ssz_type.hashTreeRoot(field_value, self.blocks_bytes[(i * 32) .. (i + 1) * 32]);
+                try ssz_type.hashTreeRoot(&field_value, self.blocks_bytes[(i * 32) .. (i + 1) * 32]);
             }
 
             const result = try merkleize(hashFn, self.blocks_bytes, max_chunk_count, out);
@@ -91,7 +91,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         // Fixed part                         Variable part
         // [field1 offset][field2 data       ][field1 data               ]
         // [0x000000c]    [0xaabbaabbaabbaabb][0xffffffffffffffffffffffff]
-        pub fn serializeSize(self: @This(), value: ZT) usize {
+        pub fn serializeSize(self: @This(), value: *const ZT) usize {
             var size: usize = 0;
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
@@ -99,7 +99,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 const ssz_type = @field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
                     size += 4;
-                    size += ssz_type.serializeSize(field_value);
+                    size += ssz_type.serializeSize(&field_value);
                 } else {
                     size += ssz_type.fixed_size.?;
                 }
@@ -107,7 +107,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return size;
         }
 
-        pub fn serializeToBytes(self: @This(), value: ZT, out: []u8) !usize {
+        pub fn serializeToBytes(self: @This(), value: *const ZT, out: []u8) !usize {
             var fixed_index: usize = 0;
             var variable_index = self.fixed_end;
 
@@ -121,9 +121,9 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                     const variable_index_endian = if (native_endian == .big) @byteSwap(variable_index) else variable_index;
                     slice[0] = @intCast(variable_index_endian);
                     fixed_index += 4;
-                    variable_index = try ssz_type.serializeToBytes(field_value, out[variable_index..]);
+                    variable_index = try ssz_type.serializeToBytes(&field_value, out[variable_index..]);
                 } else {
-                    fixed_index = try ssz_type.serializeToBytes(field_value, out[fixed_index..]);
+                    fixed_index = try ssz_type.serializeToBytes(&field_value, out[fixed_index..]);
                 }
             }
 
@@ -257,15 +257,15 @@ test "basic ContainerType {x: uint, y:uint}" {
 
     const obj = ZigType{ .x = 0xffffffffffffffff, .y = 0 };
     var root = [_]u8{0} ** 32;
-    try containerType.hashTreeRoot(obj, root[0..]);
+    try containerType.hashTreeRoot(&obj, root[0..]);
     std.debug.print("containerType.hashTreeRoot(0xffffffffffffffff) {any}\n", .{root});
 
-    const size = containerType.serializeSize(obj);
+    const size = containerType.serializeSize(&obj);
     // 2 uint64 = 2 * 8 = 16 bytes
     try expect(size == 16);
     const bytes = try allocator.alloc(u8, size);
     defer allocator.free(bytes);
-    _ = try containerType.serializeToBytes(obj, bytes);
+    _ = try containerType.serializeToBytes(&obj, bytes);
     var obj2: ZigType = undefined;
     _ = try containerType.deserializeFromBytes(bytes, &obj2);
     try expect(obj2.x == obj.x);
@@ -320,14 +320,14 @@ test "ContainerType with embedded struct" {
     const a = ZigType0{ .x = 0xffffffffffffffff, .y = 0 };
     const b = ZigType0{ .x = 0, .y = 0xffffffffffffffff };
     const obj = ZigType1{ .a = a, .b = b };
-    const size = containerType1.serializeSize(obj);
+    const size = containerType1.serializeSize(&obj);
     // a = 2 * 8 bytes, b = 2 * 8 bytes
     try expect(size == 32);
     const bytes = try allocator.alloc(u8, size);
     defer allocator.free(bytes);
 
     // serialize + deserialize
-    _ = try containerType1.serializeToBytes(obj, bytes);
+    _ = try containerType1.serializeToBytes(&obj, bytes);
     var obj2: ZigType1 = undefined;
     _ = try containerType1.deserializeFromBytes(bytes, &obj2);
     try expect(obj2.a.x == a.x);
@@ -335,10 +335,13 @@ test "ContainerType with embedded struct" {
     try expect(obj2.b.x == b.x);
     try expect(obj2.b.y == b.y);
     try expect(containerType1.equals(&obj, &obj2));
+    // TODO: fix this
     // var root = [_]u8{0} ** 32;
     // try containerType1.hashTreeRoot(&obj, root[0..]);
     // var root2 = [_]u8{0} ** 32;
     // try containerType1.hashTreeRoot(&obj2, root2[0..]);
+    // std.debug.print("root {any} \n", .{root});
+    // std.debug.print("root2 {any} \n", .{root2});
     // try std.testing.expectEqualSlices(u8, root[0..], root2[0..]);
 
     // clone, equal

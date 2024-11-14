@@ -26,29 +26,24 @@ pub fn createUintType(comptime num_bytes: usize) type {
             // do nothing
         }
 
-        pub fn hashTreeRoot(_: @This(), value: anytype, out: []u8) !void {
+        pub fn hashTreeRoot(_: @This(), value: *const T, out: []u8) !void {
             if (out.len < num_bytes) {
                 return error.InCorrectLen;
             }
 
-            const value_type = @TypeOf(value);
-            if (value_type != T) {
-                @compileError("value type is not correct");
-            }
-
             const slice = std.mem.bytesAsSlice(T, out);
-            const endian_value = if (native_endian == .big) @byteSwap(value) else value;
+            const endian_value = if (native_endian == .big) @byteSwap(value.*) else value.*;
             slice[0] = endian_value;
         }
 
         // Serialization + deserialization
 
         // unused param but want to follow the same interface as other types
-        pub fn serializeSize(_: @This(), _: T) usize {
+        pub fn serializeSize(_: @This(), _: *const T) usize {
             return num_bytes;
         }
 
-        pub fn serializeToBytes(self: @This(), value: anytype, out: []u8) !usize {
+        pub fn serializeToBytes(self: @This(), value: *const T, out: []u8) !usize {
             try self.hashTreeRoot(value, out);
             return num_bytes;
         }
@@ -85,7 +80,7 @@ test "createUintType" {
     // defer uintType.deinit();
     const value: u64 = 0xffffffffffffffff;
     var root = [_]u8{0} ** 32;
-    try uintType.hashTreeRoot(value, root[0..]);
+    try uintType.hashTreeRoot(&value, root[0..]);
     // std.debug.print("uintType.hashTreeRoot(0xffffffffffffffff) {any}\n", .{root});
 
     // TODO: more unit tests: serialize + deserialize, clone, make sure can mutate output values
