@@ -61,15 +61,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             self.allocator.free(self.blocks_bytes);
         }
 
-        // caller should free the result
-        pub fn hashTreeRoot(self: @This(), value: ZT) ![]u8 {
-            const result = try self.allocator.alloc(u8, 32);
-            @memset(result, 0);
-            try self.hashTreeRootInto(value, result);
-            return result;
-        }
-
-        pub fn hashTreeRootInto(self: @This(), value: ZT, out: []u8) !void {
+        pub fn hashTreeRoot(self: @This(), value: ZT, out: []u8) !void {
             if (out.len != 32) {
                 return error.InCorrectLen;
             }
@@ -85,7 +77,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 const field_name = field_info.name;
                 const field_value = @field(value, field_name);
                 const ssz_type = @field(self.ssz_fields, field_name);
-                try ssz_type.hashTreeRootInto(field_value, self.blocks_bytes[(i * 32) .. (i + 1) * 32]);
+                try ssz_type.hashTreeRoot(field_value, self.blocks_bytes[(i * 32) .. (i + 1) * 32]);
             }
 
             const result = try merkleize(hashFn, self.blocks_bytes, max_chunk_count, out);
@@ -240,7 +232,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
 test "basic ContainerType {x: uint, y:uint}" {
     var allocator = std.testing.allocator;
     const UintType = @import("./uint.zig").createUintType(8);
-    const uintType = try UintType.init(&allocator);
+    const uintType = try UintType.init();
     const SszType = struct {
         x: UintType,
         y: UintType,
@@ -256,9 +248,9 @@ test "basic ContainerType {x: uint, y:uint}" {
     });
 
     const obj = ZigType{ .x = 0xffffffffffffffff, .y = 0 };
-    const result = try containerType.hashTreeRoot(obj);
-    std.debug.print("containerType.hashTreeRoot(0xffffffffffffffff) {any}\n", .{result});
-    allocator.free(result);
+    var root = [_]u8{0} ** 32;
+    try containerType.hashTreeRoot(obj, root[0..]);
+    std.debug.print("containerType.hashTreeRoot(0xffffffffffffffff) {any}\n", .{root});
 
     const size = containerType.serializeSize(obj);
     // 2 uint64 = 2 * 8 = 16 bytes
@@ -285,7 +277,7 @@ test "basic ContainerType {x: uint, y:uint}" {
 test "ContainerType with embedded struct" {
     var allocator = std.testing.allocator;
     const UintType = @import("./uint.zig").createUintType(8);
-    const uintType = try UintType.init(&allocator);
+    const uintType = try UintType.init();
     defer UintType.deinit();
     const SszType0 = struct {
         x: UintType,

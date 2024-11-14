@@ -16,26 +16,17 @@ pub fn createUintType(comptime num_bytes: usize) type {
     };
 
     return struct {
-        allocator: *std.mem.Allocator,
         fixed_size: ?usize,
 
-        pub fn init(allocator: *std.mem.Allocator) !@This() {
-            return @This(){ .allocator = allocator, .fixed_size = num_bytes };
+        pub fn init() !@This() {
+            return @This(){ .fixed_size = num_bytes };
         }
 
         pub fn deinit() void {
             // do nothing
         }
 
-        // caller should free the result
-        pub fn hashTreeRoot(self: @This(), value: anytype) ![]u8 {
-            const result = try self.allocator.alloc(u8, 32);
-            @memset(result, 0);
-            try self.hashTreeRootInto(value, result);
-            return result;
-        }
-
-        pub fn hashTreeRootInto(_: @This(), value: anytype, out: []u8) !void {
+        pub fn hashTreeRoot(_: @This(), value: anytype, out: []u8) !void {
             if (out.len < num_bytes) {
                 return error.InCorrectLen;
             }
@@ -58,7 +49,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
         }
 
         pub fn serializeToBytes(self: @This(), value: anytype, out: []u8) !usize {
-            try self.hashTreeRootInto(value, out);
+            try self.hashTreeRoot(value, out);
             return num_bytes;
         }
 
@@ -89,18 +80,13 @@ pub fn createUintType(comptime num_bytes: usize) type {
 }
 
 test "createUintType" {
-    var allocator = std.testing.allocator;
     const UintType = createUintType(8);
-    const uintType = try UintType.init(&allocator);
+    const uintType = try UintType.init();
     // defer uintType.deinit();
-    var value: u64 = 0xffffffffffffffff;
-    var result = try uintType.hashTreeRoot(value);
-    // std.debug.print("uintType.hashTreeRoot(0xffffffffffffffff) {any}\n", .{result});
-    allocator.free(result);
-    value = 0xff;
-    result = try uintType.hashTreeRoot(value);
-    // std.debug.print("uintType.hashTreeRoot(0xff) {any}\n", .{result});
-    allocator.free(result);
+    const value: u64 = 0xffffffffffffffff;
+    var root = [_]u8{0} ** 32;
+    try uintType.hashTreeRoot(value, root[0..]);
+    // std.debug.print("uintType.hashTreeRoot(0xffffffffffffffff) {any}\n", .{root});
 
     // TODO: more unit tests: serialize + deserialize, clone, make sure can mutate output values
 }
