@@ -140,10 +140,18 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 const ssz_type = @field(self.ssz_fields, field_name);
                 const field_range = field_ranges[i];
                 const field_data = data[field_range.start..field_range.end];
-                var field_value: field_info.type = undefined;
-                try ssz_type.deserializeFromBytes(field_data, &field_value);
-                // TODO: avoid this copy?
-                @field(out, field_name) = field_value;
+                // this works, but it needs a copy of data
+                // var field_value: field_info.type = undefined;
+                // try ssz_type.deserializeFromBytes(field_data, &field_value);
+                // @field(out, field_name) = field_value;
+
+                // this involves a copy of data, and DOES NOT work
+                // var field_value = @field(out, field_name);
+                // try ssz_type.deserializeFromBytes(field_data, &field_value);
+                // @field(out, field_name) = field_value;
+
+                // no copy of data, and it works
+                try ssz_type.deserializeFromBytes(field_data, &@field(out, field_name));
             }
         }
 
@@ -327,8 +335,13 @@ test "ContainerType with embedded struct" {
     try expect(obj2.b.x == b.x);
     try expect(obj2.b.y == b.y);
     try expect(containerType1.equals(&obj, &obj2));
+    // var root = [_]u8{0} ** 32;
+    // try containerType1.hashTreeRoot(&obj, root[0..]);
+    // var root2 = [_]u8{0} ** 32;
+    // try containerType1.hashTreeRoot(&obj2, root2[0..]);
+    // try std.testing.expectEqualSlices(u8, root[0..], root2[0..]);
 
-    // clone
+    // clone, equal
     var obj3: ZigType1 = undefined;
     try containerType1.clone(&obj, &obj3);
     try expect(containerType1.equals(&obj, &obj3));
