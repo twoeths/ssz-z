@@ -66,12 +66,6 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 return error.InCorrectLen;
             }
 
-            const ValueType = @typeInfo(@TypeOf(value.*));
-            if (ValueType.Struct.fields.len != max_chunk_count) {
-                // TODO: more info to error message
-                @compileError("Number of fields is not the same");
-            }
-
             // this will also enforce all fields in value match ssz_fields
             inline for (zig_fields_info, 0..) |field_info, i| {
                 const field_name = field_info.name;
@@ -329,24 +323,25 @@ test "ContainerType with embedded struct" {
     _ = try containerType1.serializeToBytes(&obj, bytes);
     var obj2: ZigType1 = undefined;
     _ = try containerType1.deserializeFromBytes(bytes, &obj2);
-    try expect(obj2.a.x == a.x);
-    try expect(obj2.a.y == a.y);
-    try expect(obj2.b.x == b.x);
-    try expect(obj2.b.y == b.y);
+    try expect(obj2.a.x == obj.a.x);
+    try expect(obj2.a.y == obj.a.y);
+    try expect(obj2.b.x == obj.b.x);
+    try expect(obj2.b.y == obj.b.y);
     try expect(containerType1.equals(&obj, &obj2));
-    // TODO: fix this
-    // var root = [_]u8{0} ** 32;
-    // try containerType1.hashTreeRoot(&obj, root[0..]);
-    // var root2 = [_]u8{0} ** 32;
-    // try containerType1.hashTreeRoot(&obj2, root2[0..]);
-    // std.debug.print("root {any} \n", .{root});
-    // std.debug.print("root2 {any} \n", .{root2});
-    // try std.testing.expectEqualSlices(u8, root[0..], root2[0..]);
+    // confirm hash_tree_root
+    var root = [_]u8{0} ** 32;
+    try containerType1.hashTreeRoot(&obj, root[0..]);
+    var root2 = [_]u8{0} ** 32;
+    try containerType1.hashTreeRoot(&obj2, root2[0..]);
+    try std.testing.expectEqualSlices(u8, root[0..], root2[0..]);
 
     // clone, equal
     var obj3: ZigType1 = undefined;
     try containerType1.clone(&obj, &obj3);
     try expect(containerType1.equals(&obj, &obj3));
+    var root3 = [_]u8{0} ** 32;
+    try containerType1.hashTreeRoot(&obj3, root3[0..]);
+    try std.testing.expectEqualSlices(u8, root[0..], root3[0..]);
     obj3.a.x = 2024;
     try expect(obj.a.x != obj3.a.x);
 }

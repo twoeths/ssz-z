@@ -27,8 +27,12 @@ pub fn createUintType(comptime num_bytes: usize) type {
         }
 
         pub fn hashTreeRoot(_: @This(), value: *const T, out: []u8) !void {
-            if (out.len < num_bytes) {
+            if (out.len != 32) {
                 return error.InCorrectLen;
+            }
+
+            for (out) |*byte| {
+                byte.* = 0;
             }
 
             const slice = std.mem.bytesAsSlice(T, out);
@@ -43,8 +47,10 @@ pub fn createUintType(comptime num_bytes: usize) type {
             return num_bytes;
         }
 
-        pub fn serializeToBytes(self: @This(), value: *const T, out: []u8) !usize {
-            try self.hashTreeRoot(value, out);
+        pub fn serializeToBytes(_: @This(), value: *const T, out: []u8) !usize {
+            const slice = std.mem.bytesAsSlice(T, out);
+            const endian_value = if (native_endian == .big) @byteSwap(value.*) else value.*;
+            slice[0] = endian_value;
             return num_bytes;
         }
 
