@@ -79,13 +79,11 @@ pub fn createUintType(comptime num_bytes: usize) type {
             return a.* == b.*;
         }
 
-        pub fn clone(_: @This(), value: T) !T {
-            if (value < 0) {
+        pub fn clone(_: @This(), value: *const T, out: *T) !void {
+            if (value.* < 0) {
                 return error.InvalidInput;
             }
-            // const cloned_value = value.*;
-            // return &cloned_value;
-            return value;
+            out.* = value.*;
         }
     };
 }
@@ -103,6 +101,8 @@ test "createUintType" {
     result = try uintType.hashTreeRoot(value);
     // std.debug.print("uintType.hashTreeRoot(0xff) {any}\n", .{result});
     allocator.free(result);
+
+    // TODO: more unit tests: serialize + deserialize, clone, make sure can mutate output values
 }
 
 // we can use below code for hashTreeRoot() implementation above

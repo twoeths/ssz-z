@@ -138,7 +138,6 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return variable_index;
         }
 
-        // consumer should free the result
         pub fn deserializeFromBytes(self: @This(), data: []const u8, out: *ZT) !void {
             // TODO: validate data length
             // max_chunk_count is known at compile time so we can allocate on stack
@@ -169,19 +168,17 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return true;
         }
 
-        // consumer should free the result
-        pub fn clone(self: @This(), value: *const ZT) !*ZT {
-            const result_ptr = try self.allocator.create(ZT);
+        pub fn clone(self: @This(), value: *const ZT, out: *ZT) !void {
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const ssz_type = @field(self.ssz_fields, field_name);
                 const field_value = @field(value, field_name);
-                const field_value_clone = try ssz_type.clone(field_value);
-                @field(result_ptr, field_name) = field_value_clone;
+                var field_value_clone: field_info.type = undefined;
+                try ssz_type.clone(&field_value, &field_value_clone);
+                @field(out, field_name) = field_value_clone;
             }
-
-            return result_ptr;
         }
+
         // private functions
 
         // Deserializer helper: Returns the bytes ranges of all fields, both variable and fixed size.
@@ -276,9 +273,9 @@ test "basic ContainerType {x: uint, y:uint}" {
     try expect(containerType.equals(&obj, &obj2));
 
     // clone
-    const obj3 = try containerType.clone(&obj);
-    defer allocator.destroy(obj3);
-    try expect(containerType.equals(&obj, obj3));
+    var obj3: ZigType = undefined;
+    try containerType.clone(&obj, &obj3);
+    try expect(containerType.equals(&obj, &obj3));
     try expect(obj3.x == obj.x);
     try expect(obj3.y == obj.y);
 
@@ -328,6 +325,8 @@ test "ContainerType with embedded struct" {
     try expect(size == 32);
     const bytes = try allocator.alloc(u8, size);
     defer allocator.free(bytes);
+
+    // serialize + deserialize
     _ = try containerType1.serializeToBytes(obj, bytes);
     var obj2: ZigType1 = undefined;
     _ = try containerType1.deserializeFromBytes(bytes, &obj2);
@@ -336,4 +335,11 @@ test "ContainerType with embedded struct" {
     try expect(obj2.b.x == b.x);
     try expect(obj2.b.y == b.y);
     try expect(containerType1.equals(&obj, &obj2));
+
+    // clone
+    var obj3: ZigType1 = undefined;
+    try containerType1.clone(&obj, &obj3);
+    try expect(containerType1.equals(&obj, &obj3));
+    obj3.a.x = 2024;
+    try expect(obj.a.x != obj3.a.x);
 }
