@@ -75,9 +75,10 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             // this will also enforce all fields in value match ssz_fields
             inline for (zig_fields_info, 0..) |field_info, i| {
                 const field_name = field_info.name;
-                const field_value = @field(value, field_name);
-                const ssz_type = @field(self.ssz_fields, field_name);
-                try ssz_type.hashTreeRoot(&field_value, self.blocks_bytes[(i * 32) .. (i + 1) * 32]);
+                // this avoids a copy
+                const field_value_ptr = &@field(value, field_name);
+                const ssz_type = &@field(self.ssz_fields, field_name);
+                try ssz_type.hashTreeRoot(field_value_ptr, self.blocks_bytes[(i * 32) .. (i + 1) * 32]);
             }
 
             const result = try merkleize(hashFn, self.blocks_bytes, max_chunk_count, out);
@@ -95,11 +96,11 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             var size: usize = 0;
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
-                const field_value = @field(value, field_name);
-                const ssz_type = @field(self.ssz_fields, field_name);
+                const field_value_ptr = &@field(value, field_name);
+                const ssz_type = &@field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
                     size += 4;
-                    size += ssz_type.serializeSize(&field_value);
+                    size += ssz_type.serializeSize(field_value_ptr);
                 } else {
                     size += ssz_type.fixed_size.?;
                 }
@@ -113,17 +114,17 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
 
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
-                const field_value = @field(value, field_name);
-                const ssz_type = @field(self.ssz_fields, field_name);
+                const field_value_ptr = &@field(value, field_name);
+                const ssz_type = &@field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
                     // write offset
                     const slice = std.mem.bytesAsSlice(u32, out[fixed_index..]);
                     const variable_index_endian = if (native_endian == .big) @byteSwap(variable_index) else variable_index;
                     slice[0] = @intCast(variable_index_endian);
                     fixed_index += 4;
-                    variable_index = try ssz_type.serializeToBytes(&field_value, out[variable_index..]);
+                    variable_index = try ssz_type.serializeToBytes(field_value_ptr, out[variable_index..]);
                 } else {
-                    fixed_index = try ssz_type.serializeToBytes(&field_value, out[fixed_index..]);
+                    fixed_index = try ssz_type.serializeToBytes(field_value_ptr, out[fixed_index..]);
                 }
             }
 
@@ -137,7 +138,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             try self.getFieldRanges(data, field_ranges[0..]);
             inline for (zig_fields_info, 0..) |field_info, i| {
                 const field_name = field_info.name;
-                const ssz_type = @field(self.ssz_fields, field_name);
+                const ssz_type = &@field(self.ssz_fields, field_name);
                 const field_range = field_ranges[i];
                 const field_data = data[field_range.start..field_range.end];
                 // this works, but it needs a copy of data
@@ -158,10 +159,10 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         pub fn equals(self: @This(), a: *const ZT, b: *const ZT) bool {
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
-                const ssz_type = @field(self.ssz_fields, field_name);
-                const a_field = @field(a, field_name);
-                const b_field = @field(b, field_name);
-                if (!ssz_type.equals(&a_field, &b_field)) {
+                const ssz_type = &@field(self.ssz_fields, field_name);
+                const a_field_ptr = &@field(a, field_name);
+                const b_field_ptr = &@field(b, field_name);
+                if (!ssz_type.equals(a_field_ptr, b_field_ptr)) {
                     return false;
                 }
             }
@@ -171,11 +172,9 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         pub fn clone(self: @This(), value: *const ZT, out: *ZT) !void {
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
-                const ssz_type = @field(self.ssz_fields, field_name);
-                const field_value = @field(value, field_name);
-                var field_value_clone: field_info.type = undefined;
-                try ssz_type.clone(&field_value, &field_value_clone);
-                @field(out, field_name) = field_value_clone;
+                const ssz_type = &@field(self.ssz_fields, field_name);
+                const field_value_ptr = &@field(value, field_name);
+                try ssz_type.clone(field_value_ptr, &@field(out, field_name));
             }
         }
 
@@ -198,7 +197,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             var fixed_index: usize = 0;
             inline for (zig_fields_info, 0..) |field_info, i| {
                 const field_name = field_info.name;
-                const ssz_type = @field(self.ssz_fields, field_name);
+                const ssz_type = &@field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
                     out[i].start = offsets[variable_index];
                     out[i].end = offsets[variable_index + 1];
@@ -218,7 +217,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             var fixed_index: usize = 0;
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
-                const ssz_type = @field(self.ssz_fields, field_name);
+                const ssz_type = &@field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
                     const slice = std.mem.bytesAsSlice(u32, data[fixed_index..(fixed_index + 4)]);
                     const variable_index_endian = if (native_endian == .big) @byteSwap(slice[0]) else slice[0];
