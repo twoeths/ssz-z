@@ -4,6 +4,7 @@ const testing = std.testing;
 // pub const merkleizeBlocksBytes = @import("hash/merkleize.zig");
 pub const createUintType = @import("type/uint.zig").createUintType;
 pub const createContainerType = @import("type/container.zig").createContainerType;
+pub const createByteListType = @import("type/byte_list.zig").createByteListType;
 
 export fn add(a: i32, b: i32) i32 {
     return a + b;

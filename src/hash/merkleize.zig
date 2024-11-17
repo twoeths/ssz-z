@@ -1,6 +1,9 @@
 const std = @import("std");
 const zh = @import("./zero_hash.zig");
 pub const sha256Hash = @import("./sha256.zig").sha256Hash;
+pub const initZeroHash = @import("./zero_hash.zig").initZeroHash;
+pub const deinitZeroHash = @import("./zero_hash.zig").deinitZeroHash;
+
 const HashError = @import("./sha256.zig").HashError;
 const toRootHex = @import("util").toRootHex;
 

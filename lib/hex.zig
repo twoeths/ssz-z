@@ -18,6 +18,33 @@ pub fn toRootHex(root: []const u8) ![]u8 {
     return buffer[0..];
 }
 
+pub fn fromHex(hex: []const u8, out: []u8) !void {
+    if (hex.len % 2 != 0) {
+        return error.InvalidHexLength;
+    }
+
+    if (hex.len / 2 != out.len) {
+        return error.InvalidOutputLength;
+    }
+
+    var i: usize = 0;
+    while (i < hex.len) {
+        const high = try parseHexDigit(hex[i]);
+        const low = try parseHexDigit(hex[i + 1]);
+        out[i / 2] = high << 4 | low;
+        i += 2;
+    }
+}
+
+fn parseHexDigit(digit: u8) !u8 {
+    switch (digit) {
+        '0'...'9' => return digit - '0',
+        'a'...'f' => return digit - 'a' + 10,
+        'A'...'F' => return digit - 'A' + 10,
+        else => return error.InvalidHexDigit,
+    }
+}
+
 test "toRootHex" {
     const TestCase = struct {
         root: []const u8,
@@ -34,5 +61,24 @@ test "toRootHex" {
     for (test_cases) |tc| {
         const hex = try toRootHex(tc.root);
         try std.testing.expectEqualSlices(u8, tc.expected, hex);
+    }
+}
+
+test "fromHex" {
+    const TestCase = struct {
+        hex: []const u8,
+        expected: []const u8,
+    };
+
+    const test_cases = comptime [_]TestCase{
+        TestCase{ .hex = "00000000", .expected = &[_]u8{ 0, 0, 0, 0 } },
+        TestCase{ .hex = "c78009fd", .expected = &[_]u8{ 199, 128, 9, 253 } },
+        TestCase{ .hex = "C78009FD", .expected = &[_]u8{ 199, 128, 9, 253 } },
+    };
+
+    inline for (test_cases) |tc| {
+        var out = [_]u8{0} ** tc.expected.len;
+        try fromHex(tc.hex, out[0..]);
+        try std.testing.expectEqualSlices(u8, tc.expected, out[0..]);
     }
 }

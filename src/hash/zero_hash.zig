@@ -49,7 +49,7 @@ pub fn initZeroHash(allocator: *std.mem.Allocator, max_depth: usize) !void {
 
 pub fn getZeroHash(depth: usize) !*[32]u8 {
     if (instance == null) {
-        return error.OutOfMemory;
+        return error.noInitZeroHash;
     }
     return try instance.?.get(depth);
 }
