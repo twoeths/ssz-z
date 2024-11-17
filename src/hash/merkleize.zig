@@ -60,6 +60,21 @@ pub fn merkleizeBlocksBytes(hashFn: HashFn, data: []u8, chunk_count: usize, out:
     std.mem.copyForwards(u8, out, buffer_in[0..32]);
 }
 
+/// Given maxChunkCount return the chunkDepth
+/// ```
+/// n: [0,1,2,3,4,5,6,7,8,9]
+/// d: [0,0,1,2,2,3,3,3,3,4]
+/// ```
+pub fn maxChunksToDepth(n: usize) usize {
+    if (n == 0) return 0;
+
+    // Compute log2(n) and ceil it
+    const temp_f64: f64 = @floatFromInt(n);
+    const chunk_f64 = std.math.log2(temp_f64);
+    const result = std.math.ceil(chunk_f64);
+    return @intFromFloat(result);
+}
+
 test "merkleizeBlocksBytes" {
     var allocator = std.testing.allocator;
     try zh.initZeroHash(&allocator, 10);
@@ -109,5 +124,14 @@ test "merkleizeBlocksBytes" {
 fn concatChunks(chunks: []const [32]u8, out: []u8) void {
     for (chunks, 0..) |chunk, i| {
         std.mem.copyForwards(u8, out[i * 32 .. (i + 1) * 32], &chunk);
+    }
+}
+
+test "maxChunksToDepth" {
+    const results = [_]usize{ 0, 0, 1, 2, 2, 3, 3, 3, 3, 4 };
+    for (0..results.len) |i| {
+        const expected = results[i];
+        const actual = maxChunksToDepth(i);
+        try std.testing.expectEqual(expected, actual);
     }
 }
