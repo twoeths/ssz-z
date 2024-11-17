@@ -1,7 +1,9 @@
 const std = @import("std");
 
-var buffer = [_]u8{0} ** 64;
+var buffer = [_]u8{0} ** 66;
 
+/// convert to root with "0x" prefix
+/// note that the returned value is reusable and changed in the next called
 pub fn toRootHex(root: []const u8) ![]u8 {
     if (root.len != 32) {
         return error.InvalidInput;
@@ -11,6 +13,8 @@ pub fn toRootHex(root: []const u8) ![]u8 {
 
     var stream = std.io.fixedBufferStream(&buffer); // Mutable stream object
     const writer = stream.writer(); // Get a mutable writer from the stream
+    try writer.writeByte('0');
+    try writer.writeByte('x');
 
     for (root) |b| {
         try std.fmt.format(writer, "{x:0>2}", .{b});
@@ -58,10 +62,10 @@ test "toRootHex" {
     };
 
     const test_cases = [_]TestCase{
-        TestCase{ .root = &[_]u8{0} ** 32, .expected = "0000000000000000000000000000000000000000000000000000000000000000" },
-        TestCase{ .root = &[_]u8{10} ** 32, .expected = "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a" },
-        TestCase{ .root = &[_]u8{17} ** 32, .expected = "1111111111111111111111111111111111111111111111111111111111111111" },
-        TestCase{ .root = &[_]u8{255} ** 32, .expected = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
+        TestCase{ .root = &[_]u8{0} ** 32, .expected = "0x0000000000000000000000000000000000000000000000000000000000000000" },
+        TestCase{ .root = &[_]u8{10} ** 32, .expected = "0x0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a" },
+        TestCase{ .root = &[_]u8{17} ** 32, .expected = "0x1111111111111111111111111111111111111111111111111111111111111111" },
+        TestCase{ .root = &[_]u8{255} ** 32, .expected = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
     };
 
     for (test_cases) |tc| {
