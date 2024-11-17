@@ -19,18 +19,24 @@ pub fn toRootHex(root: []const u8) ![]u8 {
 }
 
 pub fn fromHex(hex: []const u8, out: []u8) !void {
-    if (hex.len % 2 != 0) {
+    if (hex.len == 0) {
+        return;
+    }
+
+    const hex_value = if (hex[0] == '0' and (hex[1] == 'x' or hex[1] == 'X')) hex[2..] else hex;
+
+    if (hex_value.len % 2 != 0) {
         return error.InvalidHexLength;
     }
 
-    if (hex.len / 2 != out.len) {
+    if (hex_value.len / 2 != out.len) {
         return error.InvalidOutputLength;
     }
 
     var i: usize = 0;
-    while (i < hex.len) {
-        const high = try parseHexDigit(hex[i]);
-        const low = try parseHexDigit(hex[i + 1]);
+    while (i < hex_value.len) {
+        const high = try parseHexDigit(hex_value[i]);
+        const low = try parseHexDigit(hex_value[i + 1]);
         out[i / 2] = high << 4 | low;
         i += 2;
     }
@@ -74,6 +80,9 @@ test "fromHex" {
         TestCase{ .hex = "00000000", .expected = &[_]u8{ 0, 0, 0, 0 } },
         TestCase{ .hex = "c78009fd", .expected = &[_]u8{ 199, 128, 9, 253 } },
         TestCase{ .hex = "C78009FD", .expected = &[_]u8{ 199, 128, 9, 253 } },
+        TestCase{ .hex = "0x00000000", .expected = &[_]u8{ 0, 0, 0, 0 } },
+        TestCase{ .hex = "0xc78009fd", .expected = &[_]u8{ 199, 128, 9, 253 } },
+        TestCase{ .hex = "0xC78009FD", .expected = &[_]u8{ 199, 128, 9, 253 } },
     };
 
     inline for (test_cases) |tc| {
