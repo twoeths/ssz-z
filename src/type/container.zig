@@ -279,7 +279,7 @@ test "ContainerType with embedded struct" {
     var allocator = std.testing.allocator;
     const UintType = @import("./uint.zig").createUintType(8);
     const uintType = try UintType.init();
-    defer UintType.deinit();
+    defer uintType.deinit();
     const SszType0 = struct {
         x: UintType,
         y: UintType,

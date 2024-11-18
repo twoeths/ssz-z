@@ -83,6 +83,8 @@ pub fn createByteListType(comptime limit_bytes: usize) type {
             std.mem.copyForwards(u8, out, data);
         }
 
+        // TODO: serializeToBytes
+
         pub fn equals(_: @This(), a: []const u8, b: []const u8) bool {
             return std.mem.allEqual(u8, a, b);
         }

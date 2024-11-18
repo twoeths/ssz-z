@@ -17,12 +17,15 @@ pub fn createUintType(comptime num_bytes: usize) type {
 
     return struct {
         fixed_size: ?usize,
+        byte_length: usize,
+        min_size: usize,
+        max_size: usize,
 
         pub fn init() !@This() {
-            return @This(){ .fixed_size = num_bytes };
+            return @This(){ .fixed_size = num_bytes, .byte_length = num_bytes, .min_size = 0, .max_size = num_bytes };
         }
 
-        pub fn deinit() void {
+        pub fn deinit(_: @This()) void {
             // do nothing
         }
 
