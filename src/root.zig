@@ -7,6 +7,7 @@ pub const createContainerType = @import("type/container.zig").createContainerTyp
 pub const createByteListType = @import("type/byte_list.zig").createByteListType;
 pub const createListBasicType = @import("type/list_basic.zig").createListBasicType;
 pub const createVectorBasicType = @import("type/vector_basic.zig").createVectorBasicType;
+pub const createListCompositeType = @import("type/list_composite.zig").createListCompositeType;
 
 export fn add(a: i32, b: i32) i32 {
     return a + b;
@@ -14,7 +15,6 @@ export fn add(a: i32, b: i32) i32 {
 
 test "basic add functionality" {
     try testing.expect(add(3, 7) == 10);
-    std.debug.print("add(3, 7) == 10\n", .{});
 }
 
 test {

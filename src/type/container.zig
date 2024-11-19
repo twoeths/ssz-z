@@ -3,6 +3,7 @@ const expect = std.testing.expect;
 const merkleize = @import("hash").merkleizeBlocksBytes;
 const HashFn = @import("hash").HashFn;
 const sha256Hash = @import("hash").sha256Hash;
+const toRootHex = @import("util").toRootHex;
 
 const BytesRange = struct {
     start: usize,
@@ -18,20 +19,27 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
 
     const ContainerType = struct {
         allocator: *std.mem.Allocator,
+        // TODO: *ST to avoid copy
         ssz_fields: ST,
         // a sha256 block is 64 byte
         blocks_bytes: []u8,
+        min_size: usize,
+        max_size: usize,
         fixed_size: ?usize,
         fixed_end: usize,
         variable_field_count: usize,
 
         pub fn init(allocator: *std.mem.Allocator, ssz_fields: ST) !@This() {
+            var min_size: usize = 0;
+            var max_size: usize = 0;
             var fixed_size: ?usize = 0;
             var fixed_end: usize = 0;
             var variable_field_count: usize = 0;
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const ssz_type = @field(ssz_fields, field_name);
+                min_size = min_size + ssz_type.min_size;
+                max_size = max_size + ssz_type.max_size;
                 const field_fixed_size = ssz_type.fixed_size;
                 if (field_fixed_size == null) {
                     fixed_size = null;
@@ -51,6 +59,8 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 .allocator = allocator,
                 .ssz_fields = ssz_fields,
                 .blocks_bytes = try allocator.alloc(u8, 32 * blocks_bytes_len),
+                .min_size = min_size,
+                .max_size = max_size,
                 .fixed_size = fixed_size,
                 .fixed_end = fixed_end,
                 .variable_field_count = variable_field_count,
@@ -251,7 +261,9 @@ test "basic ContainerType {x: uint, y:uint}" {
     const obj = ZigType{ .x = 0xffffffffffffffff, .y = 0 };
     var root = [_]u8{0} ** 32;
     try containerType.hashTreeRoot(&obj, root[0..]);
-    std.debug.print("containerType.hashTreeRoot(0xffffffffffffffff) {any}\n", .{root});
+    const rootHex = try toRootHex(root[0..]);
+    // 0x59a751e5d7d17ee0f3eebab3ef17512aca150acc6f59173d6e217cccced5f0d4
+    try std.testing.expectEqualSlices(u8, "0x59a751e5d7d17ee0f3eebab3ef17512aca150acc6f59173d6e217cccced5f0d4", rootHex);
 
     const size = containerType.serializeSize(&obj);
     // 2 uint64 = 2 * 8 = 16 bytes
