@@ -10,6 +10,7 @@ const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 
+/// List: ordered variable-length homogeneous collection, limited to N values
 /// ST: ssz element type
 /// ZT: zig element type
 pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
