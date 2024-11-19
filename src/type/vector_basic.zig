@@ -15,7 +15,7 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
 
     const VectorBasicType = struct {
         allocator: *std.mem.Allocator,
-        element_type: ST,
+        element_type: *ST,
         length: usize,
         fixed_size: ?usize,
         depth: usize,
@@ -26,7 +26,7 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
         // this should always be a multiple of 64 bytes
         block_bytes: []u8,
 
-        pub fn init(allocator: *std.mem.Allocator, element_type: ST, length: usize) !@This() {
+        pub fn init(allocator: *std.mem.Allocator, element_type: *ST, length: usize) !@This() {
             const elem_byte_length = element_type.byte_length;
             const byte_len = elem_byte_length * length;
             const max_chunk_count: usize = (byte_len + 31 / 32);
@@ -111,8 +111,8 @@ test "deserializeFromBytes" {
     // uint of 8 bytes = u64
     const UintType = @import("./uint.zig").createUintType(8);
     const VectorBasicType = createVectorBasicType(UintType, u64);
-    const uintType = try UintType.init();
-    var vectorType = try VectorBasicType.init(&allocator, uintType, 8);
+    var uintType = try UintType.init();
+    var vectorType = try VectorBasicType.init(&allocator, &uintType, 8);
     defer uintType.deinit();
     defer vectorType.deinit();
 

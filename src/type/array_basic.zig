@@ -1,8 +1,11 @@
+const array = @import("./array.zig").withElementTypes;
+
 /// ST: ssz element type
 /// ZT: zig type
 pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
+    const Array = array(ST, ZT);
     const ArrayBasic = struct {
-        pub fn serializeToBytes(element_type: ST, value: []const ZT, out: []u8) !usize {
+        pub fn serializeToBytes(element_type: *ST, value: []const ZT, out: []u8) !usize {
             const elem_byte_length = element_type.byte_length;
             const byte_len = elem_byte_length * value.len;
             if (byte_len != out.len) {
@@ -16,7 +19,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return byte_len;
         }
 
-        pub fn deserializeFromBytes(element_type: ST, data: []const u8, out: []ZT) !void {
+        pub fn deserializeFromBytes(element_type: *ST, data: []const u8, out: []ZT) !void {
             const elem_byte_length = element_type.byte_length;
             if (data.len % elem_byte_length != 0) {
                 return error.InCorrectLen;
@@ -32,24 +35,12 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             }
         }
 
-        pub fn valueEquals(element_type: ST, a: []const ZT, b: []const ZT) bool {
-            if (a.len != b.len) {
-                return false;
-            }
-
-            for (a, b) |*a_elem, *b_elem| {
-                if (!element_type.equals(a_elem, b_elem)) {
-                    return false;
-                }
-            }
-
-            return true;
+        pub fn valueEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {
+            return Array.valueEquals(element_type, a, b);
         }
 
-        pub fn valueClone(element_type: ST, value: []const ZT, out: []ZT) !void {
-            for (value, out) |*elem, *out_elem| {
-                try element_type.clone(elem, out_elem);
-            }
+        pub fn valueClone(element_type: *ST, value: []const ZT, out: []ZT) !void {
+            return Array.valueClone(element_type, value, out);
         }
     };
 

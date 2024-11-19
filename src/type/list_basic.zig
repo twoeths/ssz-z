@@ -19,7 +19,7 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
 
     const ListBasicType = struct {
         allocator: *std.mem.Allocator,
-        element_type: ST,
+        element_type: *ST,
         limit: usize,
         fixed_size: ?usize,
         depth: usize,
@@ -31,7 +31,8 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
         block_bytes: BlockBytes,
         mix_in_length_block_bytes: []u8,
 
-        pub fn init(allocator: *std.mem.Allocator, element_type: ST, limit: usize, init_capacity: usize) !@This() {
+        /// init_capacity is the initial capacity of elements, not bytes
+        pub fn init(allocator: *std.mem.Allocator, element_type: *ST, limit: usize, init_capacity: usize) !@This() {
             const elem_byte_length = element_type.byte_length;
             const init_capacity_bytes = init_capacity * elem_byte_length;
             const max_chunk_count = (limit * elem_byte_length + 31) / 32;
@@ -112,8 +113,8 @@ test "deserializeFromBytes" {
     // uint of 8 bytes = u64
     const UintType = @import("./uint.zig").createUintType(8);
     const ListBasicType = createListBasicType(UintType, u64);
-    const uintType = try UintType.init();
-    var listType = try ListBasicType.init(&allocator, uintType, 128, 128);
+    var uintType = try UintType.init();
+    var listType = try ListBasicType.init(&allocator, &uintType, 128, 128);
     defer uintType.deinit();
     defer listType.deinit();
 
