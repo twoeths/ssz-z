@@ -71,7 +71,7 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
         }
 
         // Serialization + deserialization
-        pub fn serializeSize(self: @This(), _: []const ZT) usize {
+        pub fn serializedSize(self: @This(), _: []const ZT) usize {
             return self.fixed_size;
         }
 

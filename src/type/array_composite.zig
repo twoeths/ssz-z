@@ -17,12 +17,12 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             }
         }
 
-        pub fn serializeSize(element_type: *ST, value: []const ZT) usize {
+        pub fn serializedSize(element_type: *ST, value: []const ZT) usize {
             if (element_type.fixed_size == null) {
                 // variable length
                 var size: usize = 0;
                 for (value) |*elem| {
-                    size += 4 + element_type.serializeSize(elem);
+                    size += 4 + element_type.serializedSize(elem);
                 }
 
                 return size;

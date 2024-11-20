@@ -67,7 +67,7 @@ pub fn createByteListType(comptime limit_bytes: usize) type {
         }
 
         // TODO: make sure this works with parent as containerType, make a unit test for it
-        pub fn serializeSize(_: @This(), value: []const u8) usize {
+        pub fn serializedSize(_: @This(), value: []const u8) usize {
             return value.len;
         }
 

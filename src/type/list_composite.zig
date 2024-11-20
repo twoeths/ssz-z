@@ -97,13 +97,13 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
         }
 
         // Serialization + deserialization
-        pub fn serializeSize(self: @This(), value: []const ZT) usize {
-            return ArrayComposite.serializeSize(self.element_type, value);
+        pub fn serializedSize(self: @This(), value: []const ZT) usize {
+            return ArrayComposite.serializedSize(self.element_type, value);
         }
 
         pub fn serializeToBytes(self: @This(), value: []const ZT, out: []u8) !usize {
             // TODO: do we need this validation?
-            const size = self.serializeSize(value);
+            const size = self.serializedSize(value);
             if (out.len != size) {
                 return error.InCorrectLen;
             }

@@ -81,7 +81,7 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
         }
 
         // Serialization + deserialization
-        pub fn serializeSize(self: @This(), value: []const ZT) usize {
+        pub fn serializedSize(self: @This(), value: []const ZT) usize {
             return self.element_type.byte_length * value.len;
         }
 

@@ -46,7 +46,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
         // Serialization + deserialization
 
         // unused param but want to follow the same interface as other types
-        pub fn serializeSize(_: @This(), _: *const T) usize {
+        pub fn serializedSize(_: @This(), _: *const T) usize {
             return num_bytes;
         }
 

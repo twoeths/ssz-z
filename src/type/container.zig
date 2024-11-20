@@ -96,7 +96,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         // Fixed part                         Variable part
         // [field1 offset][field2 data       ][field1 data               ]
         // [0x000000c]    [0xaabbaabbaabbaabb][0xffffffffffffffffffffffff]
-        pub fn serializeSize(self: @This(), value: *const ZT) usize {
+        pub fn serializedSize(self: @This(), value: *const ZT) usize {
             var size: usize = 0;
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
@@ -104,7 +104,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 const ssz_type = &@field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
                     size += 4;
-                    size += ssz_type.serializeSize(field_value_ptr);
+                    size += ssz_type.serializedSize(field_value_ptr);
                 } else {
                     size += ssz_type.fixed_size.?;
                 }
@@ -265,7 +265,7 @@ test "basic ContainerType {x: uint, y:uint}" {
     // 0x59a751e5d7d17ee0f3eebab3ef17512aca150acc6f59173d6e217cccced5f0d4
     try std.testing.expectEqualSlices(u8, "0x59a751e5d7d17ee0f3eebab3ef17512aca150acc6f59173d6e217cccced5f0d4", rootHex);
 
-    const size = containerType.serializeSize(&obj);
+    const size = containerType.serializedSize(&obj);
     // 2 uint64 = 2 * 8 = 16 bytes
     try expect(size == 16);
     const bytes = try allocator.alloc(u8, size);
@@ -325,7 +325,7 @@ test "ContainerType with embedded struct" {
     const a = ZigType0{ .x = 0xffffffffffffffff, .y = 0 };
     const b = ZigType0{ .x = 0, .y = 0xffffffffffffffff };
     const obj = ZigType1{ .a = a, .b = b };
-    const size = containerType1.serializeSize(&obj);
+    const size = containerType1.serializedSize(&obj);
     // a = 2 * 8 bytes, b = 2 * 8 bytes
     try expect(size == 32);
     const bytes = try allocator.alloc(u8, size);
