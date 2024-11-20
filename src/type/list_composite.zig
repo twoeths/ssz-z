@@ -71,7 +71,9 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
 
             // populate self.block_bytes
             for (value, 0..) |*elem, i| {
-                try self.element_type.hashTreeRoot(elem, self.block_bytes.items[i * 32 .. (i + 1) * 32]);
+                // ZT could be a slice, in that case we should pass elem itself instead of pointer to pointer
+                const elem_ptr = if (@typeInfo(@TypeOf(elem.*)) == .Pointer) elem.* else elem;
+                try self.element_type.hashTreeRoot(elem_ptr, self.block_bytes.items[i * 32 .. (i + 1) * 32]);
             }
 
             // zero out the last block if needed
@@ -208,7 +210,7 @@ test "ListCompositeType - element type is ListBasicType" {
 
     const UintType = @import("./uint.zig").createUintType(2);
 
-    const ZigListBasicType = [2]u16;
+    const ZigListBasicType = []u16;
 
     const SSZListBasicType = @import("./list_basic.zig").createListBasicType(UintType, u16);
 
@@ -222,34 +224,55 @@ test "ListCompositeType - element type is ListBasicType" {
     var listType = try ListCompositeType.init(&allocator, &elementType, 2, 2);
     defer listType.deinit();
 
+    const TestCaseValue = []const u16;
     const TestCase = struct {
         serializedHex: []const u8,
-        value: []const ZigListBasicType,
+        value: []const TestCaseValue,
         root: []const u8,
     };
+
+    // TODO: make this inline in test
+    const test_1_value_0 = [_]u16{ 1, 2 };
+    const test_1_value_1 = [_]u16{ 3, 4 };
+    const test_1_value_0_slice = test_1_value_0[0..];
+    const test_1_value_1_slice = test_1_value_1[0..];
+
+    // const empty: []u16 = ([_]u16{})[0..];
 
     const testCases = [_]TestCase{
         // empty
         TestCase{ .serializedHex = "0x", .value = &[_]ZigListBasicType{} ** 0, .root = "0x7a0501f5957bdf9cb3a8ff4966f02265f968658b7a9c62642cba1165e86642f5" },
         // 2 full values
-        TestCase{ .serializedHex = "0x080000000c0000000100020003000400", .value = &[_]ZigListBasicType{ .{ 1, 2 }, .{ 3, 4 } }, .root = "0x58140d48f9c24545c1e3a50f1ebcca85fd40433c9859c0ac34342fc8e0a800b8" },
-        // // 2 empty values
-        // TestCase{ .serializedHex = "0x0800000008000000", .value = &[_]ZigListBasicType{ .{}, .{} }, .root = "0xe839a22714bda05923b611d07be93b4d707027d29fd9eef7aa864ed587e462ec" },
+        TestCase{ .serializedHex = "0x080000000c0000000100020003000400", .value = &[_]TestCaseValue{ test_1_value_0_slice, test_1_value_1_slice }, .root = "0x58140d48f9c24545c1e3a50f1ebcca85fd40433c9859c0ac34342fc8e0a800b8" },
+        // 2 empty values
+        // TestCase{ .serializedHex = "0x0800000008000000", .value = &[_]ZigListBasicType{ empty, empty }, .root = "0xe839a22714bda05923b611d07be93b4d707027d29fd9eef7aa864ed587e462ec" },
     };
 
     // TODO: dedup to the above tests
     // just declare max size on stack memory
     var serializedMax = [_]u8{0} ** 1024;
-    var valueMax: [100]ZigListBasicType = undefined;
+    // var valueMax: [100]ZigListBasicType = undefined;
     for (testCases) |tc| {
         const serialized = serializedMax[0..((tc.serializedHex.len - 2) / 2)];
         try fromHex(tc.serializedHex, serialized);
-        // TODO: is it an issue having to know the length of the value?
-        var value = valueMax[0..tc.value.len];
+        // deserializeFromBytes requries consumers to know the size in advance
+        var totalBytes: usize = 0;
+        for (tc.value) |*v| {
+            totalBytes = totalBytes + v.len;
+        }
+        var buffer = try allocator.alloc(u16, totalBytes);
+        defer allocator.free(buffer);
+        var value = try allocator.alloc([]u16, tc.value.len);
+        defer allocator.free(value);
+        var buffer_offset: usize = 0;
+        for (tc.value, 0..) |*v, i| {
+            value[i] = buffer[buffer_offset .. buffer_offset + v.len];
+            buffer_offset = buffer_offset + v.len;
+        }
         try listType.deserializeFromBytes(serialized, value);
         try std.testing.expectEqual(value.len, tc.value.len);
 
-        for (value, tc.value) |*a, *b| {
+        for (value, tc.value) |a, b| {
             try std.testing.expect(elementType.equals(a, b));
         }
         var root = [_]u8{0} ** 32;
@@ -258,13 +281,22 @@ test "ListCompositeType - element type is ListBasicType" {
         try std.testing.expectEqualSlices(u8, tc.root, rootHex);
 
         // clone
-        const cloned = valueMax[tc.value.len..(tc.value.len * 2)];
-        try listType.clone(value, cloned);
+        // deserializeFromBytes requries consumers to know the size in advance
+        var buffer2 = try allocator.alloc(u16, totalBytes);
+        defer allocator.free(buffer2);
+        var value2 = try allocator.alloc([]u16, tc.value.len);
+        defer allocator.free(value2);
+        var buffer_offset2: usize = 0;
+        for (tc.value, 0..) |*v, i| {
+            value2[i] = buffer2[buffer_offset2 .. buffer_offset2 + v.len];
+            buffer_offset2 = buffer_offset2 + v.len;
+        }
+        try listType.clone(value, value2);
         var root2 = [_]u8{0} ** 32;
-        try listType.hashTreeRoot(cloned[0..], root2[0..]);
+        try listType.hashTreeRoot(value2[0..], root2[0..]);
         try std.testing.expectEqualSlices(u8, root2[0..], root[0..]);
 
         // equals
-        try std.testing.expect(listType.equals(value[0..], cloned[0..]));
+        try std.testing.expect(listType.equals(value, value2));
     }
 }

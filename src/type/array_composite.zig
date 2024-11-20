@@ -58,11 +58,19 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
         }
 
         pub fn deserializeFromBytes(allocator: *std.mem.Allocator, element_type: *ST, data: []const u8, out: []ZT) !void {
+            if (data.len == 0) {
+                return;
+            }
+
             const offsets = try readOffsetsArrayComposite(allocator, element_type, data);
             defer allocator.free(offsets);
+
             for (out, 0..) |*elem, i| {
                 const elem_data = if (i == out.len - 1) data[offsets[i]..] else data[offsets[i]..offsets[i + 1]];
-                try element_type.deserializeFromBytes(elem_data, elem);
+
+                // ZT could be a slice, in that case we should pass elem itself instead of pointer to pointer
+                const elem_ptr = if (comptime @typeInfo(ZT) == .Pointer) elem.* else elem;
+                try element_type.deserializeFromBytes(elem_data, elem_ptr);
             }
         }
 
