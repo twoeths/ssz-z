@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const expect = std.testing.expect;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
@@ -68,6 +69,21 @@ pub fn createUintType(comptime num_bytes: usize) type {
             // use var to make the compiler happy
             const endian_value = if (native_endian == .big) @byteSwap(value) else value;
             out.* = endian_value;
+        }
+
+        /// Same to deserializeFromBytes but this returns *T instead of out param
+        /// Consumer need to free the memory
+        pub fn deserializeFromSlice(_: @This(), allocator: Allocator, slice: []const u8) !*T {
+            if (slice.len < num_bytes) {
+                return error.InCorrectLen;
+            }
+
+            const result = try allocator.create(T);
+            const sliceT = std.mem.bytesAsSlice(T, slice);
+            const value = sliceT[0];
+            const endian_value = if (native_endian == .big) @byteSwap(value) else value;
+            result.* = endian_value;
+            return result;
         }
 
         pub fn equals(_: @This(), a: *const T, b: *const T) bool {

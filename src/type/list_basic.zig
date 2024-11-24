@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const maxChunksToDepth = @import("hash").maxChunksToDepth;
 const merkleize = @import("hash").merkleizeBlocksBytes;
 const sha256Hash = @import("hash").sha256Hash;
@@ -86,11 +87,17 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
         }
 
         pub fn serializeToBytes(self: @This(), value: []const ZT, out: []u8) !usize {
-            try ArrayBasic.serializeToBytes(self.element_type, value, out);
+            return try ArrayBasic.serializeToBytes(self.element_type, value, out);
         }
 
         pub fn deserializeFromBytes(self: @This(), data: []const u8, out: []ZT) !void {
             try ArrayBasic.deserializeFromBytes(self.element_type, data, out);
+        }
+
+        /// Same to deserializeFromBytes but this returns *T instead of out param
+        /// Consumer need to free the memory
+        pub fn deserializeFromSlice(self: @This(), allocator: Allocator, slice: []const u8) ![]ZT {
+            return try ArrayBasic.deserializeFromSlice(allocator, self.element_type, slice);
         }
 
         pub fn equals(self: @This(), a: []const ZT, b: []const ZT) bool {

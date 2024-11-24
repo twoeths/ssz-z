@@ -1,3 +1,5 @@
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const array = @import("./array.zig").withElementTypes;
 
 /// ST: ssz element type
@@ -33,6 +35,23 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             for (out, 0..) |*elem, i| {
                 try element_type.deserializeFromBytes(data[i * elem_byte_length .. (i + 1) * elem_byte_length], elem);
             }
+        }
+
+        pub fn deserializeFromSlice(allocator: Allocator, element_type: *ST, data: []const u8) ![]ZT {
+            const elem_byte_length = element_type.byte_length;
+            if (data.len % elem_byte_length != 0) {
+                return error.InCorrectLen;
+            }
+
+            const elem_count = data.len / elem_byte_length;
+            const result = try allocator.alloc(ZT, elem_count);
+            for (result, 0..) |*elem, i| {
+                // TODO: how to avoid the copy?
+                // improve this when we have benchmark test
+                elem.* = (try element_type.deserializeFromSlice(allocator, data[i * elem_byte_length .. (i + 1) * elem_byte_length])).*;
+            }
+
+            return result;
         }
 
         pub fn valueEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {
