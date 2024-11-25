@@ -96,8 +96,8 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
 
         /// Same to deserializeFromBytes but this returns *T instead of out param
         /// Consumer need to free the memory
-        pub fn deserializeFromSlice(self: @This(), allocator: Allocator, slice: []const u8) ![]ZT {
-            return try ArrayBasic.deserializeFromSlice(allocator, self.element_type, slice);
+        pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8) ![]ZT {
+            return try ArrayBasic.deserializeFromSlice(arenaAllocator, self.element_type, slice);
         }
 
         pub fn equals(self: @This(), a: []const ZT, b: []const ZT) bool {
