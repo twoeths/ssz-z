@@ -5,6 +5,7 @@ const deinitZeroHash = @import("hash").deinitZeroHash;
 const toRootHex = @import("util").toRootHex;
 
 pub const TypeTestCase = struct {
+    id: []const u8,
     serializedHex: []const u8,
     json: []const u8,
     rootHex: []const u8,
