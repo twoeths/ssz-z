@@ -37,7 +37,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             }
         }
 
-        pub fn deserializeFromSlice(arenaAllocator: Allocator, element_type: *ST, data: []const u8) ![]ZT {
+        pub fn deserializeFromSlice(arenaAllocator: Allocator, element_type: *ST, data: []const u8, _: ?[]ZT) ![]ZT {
             const elem_byte_length = element_type.byte_length;
             if (data.len % elem_byte_length != 0) {
                 return error.InCorrectLen;

@@ -31,7 +31,7 @@ pub fn typeTest(comptime ST: type, comptime ZT: type) type {
             // deserialize
             var arena = std.heap.ArenaAllocator.init(allocator);
             defer arena.deinit();
-            const value = try t.deserializeFromSlice(arena.allocator(), serialized);
+            const value = try t.deserializeFromSlice(arena.allocator(), serialized, null);
             const parsedJson = try std.json.parseFromSlice(ZT, allocator, tc.json, .{});
             defer parsedJson.deinit();
             try std.testing.expect(t.equals(value, parsedJson.value));
