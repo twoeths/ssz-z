@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const expect = std.testing.expect;
 const merkleize = @import("hash").merkleizeBlocksBytes;
 const HashFn = @import("hash").HashFn;
@@ -18,7 +19,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
     const native_endian = @import("builtin").target.cpu.arch.endian();
 
     const ContainerType = struct {
-        allocator: *std.mem.Allocator,
+        allocator: *Allocator,
         // TODO: *ST to avoid copy
         ssz_fields: ST,
         // a sha256 block is 64 byte
@@ -29,7 +30,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         fixed_end: usize,
         variable_field_count: usize,
 
-        pub fn init(allocator: *std.mem.Allocator, ssz_fields: ST) !@This() {
+        pub fn init(allocator: *Allocator, ssz_fields: ST) !@This() {
             var min_size: usize = 0;
             var max_size: usize = 0;
             var fixed_size: ?usize = 0;
@@ -71,7 +72,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             self.allocator.free(self.blocks_bytes);
         }
 
-        pub fn hashTreeRoot(self: @This(), value: *const ZT, out: []u8) !void {
+        pub fn hashTreeRoot(self: *@This(), value: *const ZT, out: []u8) !void {
             if (out.len != 32) {
                 return error.InCorrectLen;
             }
@@ -80,7 +81,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             inline for (zig_fields_info, 0..) |field_info, i| {
                 const field_name = field_info.name;
                 // this avoids a copy
-                const field_value_ptr = &@field(value, field_name);
+                const field_value_ptr = if (@typeInfo(field_info.type) == .Pointer) @field(value, field_name) else &@field(value, field_name);
                 const ssz_type = &@field(self.ssz_fields, field_name);
                 try ssz_type.hashTreeRoot(field_value_ptr, self.blocks_bytes[(i * 32) .. (i + 1) * 32]);
             }
@@ -118,7 +119,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
 
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
-                const field_value_ptr = &@field(value, field_name);
+                const field_value_ptr = if (@typeInfo(field_info.type) == .Pointer) @field(value, field_name) else &@field(value, field_name);
                 const ssz_type = &@field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
                     // write offset
@@ -160,12 +161,37 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             }
         }
 
+        /// for embedded struct, it's allocated by the parent struct
+        /// for pointer or slice, it's allocated on its own
+        pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, out: ?*ZT) !*ZT {
+            var out2 = if (out != null) out.? else try arenaAllocator.create(ZT);
+
+            // TODO: validate data length
+            // max_chunk_count is known at compile time so we can allocate on stack
+            var field_ranges = [_]BytesRange{.{ .start = 0, .end = 0 }} ** max_chunk_count;
+            try self.getFieldRanges(slice, field_ranges[0..]);
+            inline for (zig_fields_info, 0..) |field_info, i| {
+                const field_name = field_info.name;
+                const ssz_type = &@field(self.ssz_fields, field_name);
+                const field_range = field_ranges[i];
+                const field_data = slice[field_range.start..field_range.end];
+
+                if (@typeInfo(field_info.type) == .Pointer) {
+                    @field(out2, field_name) = try ssz_type.deserializeFromSlice(arenaAllocator, field_data, null);
+                } else {
+                    _ = try ssz_type.deserializeFromSlice(arenaAllocator, field_data, &@field(out2, field_name));
+                }
+            }
+
+            return out2;
+        }
+
         pub fn equals(self: @This(), a: *const ZT, b: *const ZT) bool {
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const ssz_type = &@field(self.ssz_fields, field_name);
-                const a_field_ptr = &@field(a, field_name);
-                const b_field_ptr = &@field(b, field_name);
+                const a_field_ptr = if (@typeInfo(field_info.type) == .Pointer) @field(a, field_name) else &@field(a, field_name);
+                const b_field_ptr = if (@typeInfo(field_info.type) == .Pointer) @field(b, field_name) else &@field(b, field_name);
                 if (!ssz_type.equals(a_field_ptr, b_field_ptr)) {
                     return false;
                 }
@@ -253,7 +279,7 @@ test "basic ContainerType {x: uint, y:uint}" {
         y: u64,
     };
     const ContainerType = createContainerType(SszType, ZigType, sha256Hash);
-    const containerType = try ContainerType.init(&allocator, SszType{
+    var containerType = try ContainerType.init(&allocator, SszType{
         .x = uintType,
         .y = uintType,
     });
@@ -316,7 +342,7 @@ test "ContainerType with embedded struct" {
         b: ZigType0,
     };
     const ContainerType1 = createContainerType(SszType1, ZigType1, sha256Hash);
-    const containerType1 = try ContainerType1.init(&allocator, SszType1{
+    var containerType1 = try ContainerType1.init(&allocator, SszType1{
         .a = containerType0,
         .b = containerType0,
     });
