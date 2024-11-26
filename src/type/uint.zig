@@ -72,13 +72,14 @@ pub fn createUintType(comptime num_bytes: usize) type {
         }
 
         /// Same to deserializeFromBytes but this returns *T instead of out param
-        /// Consumer need to free the memory
-        pub fn deserializeFromSlice(_: @This(), allocator: Allocator, slice: []const u8) !*T {
+        /// If this is called from ArrayBasic, out parameter is null so we have to allocate memory
+        /// If this is called from a container, out parameter is not null, no need to allocate memory
+        pub fn deserializeFromSlice(_: @This(), allocator: Allocator, slice: []const u8, out: ?*T) !*T {
             if (slice.len < num_bytes) {
                 return error.InCorrectLen;
             }
 
-            const result = try allocator.create(T);
+            const result = if (out != null) out.? else try allocator.create(T);
             const sliceT = std.mem.bytesAsSlice(T, slice);
             const value = sliceT[0];
             const endian_value = if (native_endian == .big) @byteSwap(value) else value;

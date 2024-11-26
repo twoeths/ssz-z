@@ -48,7 +48,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             for (result, 0..) |*elem, i| {
                 // TODO: how to avoid the copy?
                 // improve this when we have benchmark test
-                elem.* = (try element_type.deserializeFromSlice(arenaAllocator, data[i * elem_byte_length .. (i + 1) * elem_byte_length])).*;
+                elem.* = (try element_type.deserializeFromSlice(arenaAllocator, data[i * elem_byte_length .. (i + 1) * elem_byte_length], null)).*;
             }
 
             return result;
