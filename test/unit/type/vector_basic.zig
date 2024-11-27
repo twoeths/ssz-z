@@ -18,7 +18,7 @@ const testCases = [_]TestCase{
     },
 };
 
-test "valid test for ListBasicType" {
+test "valid test for VectorBasicType" {
     var allocator = std.testing.allocator;
     try initZeroHash(&allocator, 32);
     defer deinitZeroHash();
