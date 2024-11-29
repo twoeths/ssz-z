@@ -122,6 +122,8 @@ fn addValidTest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
     // Similar to the run step above, this creates a test step in test folder
     const lib_unit_valid_tests = b.addTest(.{
         .root_source_file = b.path("test/unit/root.zig"),
+        // use this to run a specific test
+        // .root_source_file = b.path("test/unit/type/vector_composite.zig"),
         .target = target,
         .optimize = optimize,
     });

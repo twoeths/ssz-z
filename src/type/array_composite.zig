@@ -9,6 +9,16 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
     const Array = array(ST, ZT);
 
     const ArrayComposite = struct {
+        pub fn minSize(element_type: *ST, min_count: usize) usize {
+            if (element_type.fixed_size == null) {
+                // variable length
+                return min_count * (4 + element_type.min_size);
+            } else {
+                // fixed length
+                return min_count * element_type.min_size;
+            }
+        }
+
         pub fn maxSize(element_type: *ST, max_count: usize) usize {
             if (element_type.fixed_size == null) {
                 return (element_type.max_size + 4) * max_count;
@@ -22,42 +32,46 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
                 // variable length
                 var size: usize = 0;
                 for (value) |*elem| {
-                    size += 4 + element_type.serializedSize(elem);
+                    // ZT could be a slice, in that case we should pass elem itself instead of pointer to pointer
+                    const elem_ptr = if (comptime @typeInfo(ZT) == .Pointer) elem.* else elem;
+                    size += 4 + element_type.serializedSize(elem_ptr);
                 }
 
                 return size;
             } else {
                 // fixed length
-                return (element_type.fixed_size * value.len);
+                return (element_type.fixed_size.? * value.len);
             }
         }
 
         pub fn serializeToBytes(element_type: *ST, value: []const ZT, out: []u8) !usize {
             if (element_type.fixed_size == null) {
                 // variable length
-                var variable_index = value.len * 4;
+                var variable_index: u32 = @intCast(value.len * 4);
                 const out_slice = std.mem.bytesAsSlice(u32, out);
                 for (value, 0..) |*elem, i| {
                     // write offset
-                    // TODO: lodestar always need offset here, confirm if Zig needs this or not thru unit test
+                    // TODO: typescript always need offset here, confirm if Zig needs this or not thru unit test
                     out_slice[i] = if (native_endian == .big) @byteSwap(variable_index) else variable_index;
 
                     // write serialized element to variable section
-                    variable_index = element_type.serializeToBytes(elem, out[variable_index..]);
+                    const elem_ptr = if (comptime @typeInfo(ZT) == .Pointer) elem.* else elem;
+                    variable_index = @intCast(try element_type.serializeToBytes(elem_ptr, out[variable_index..]));
                 }
 
                 return variable_index;
             } else {
                 // fixed length
-                const elem_byte_length = element_type.fixed_size;
+                const elem_byte_length = element_type.fixed_size.?;
                 for (value, 0..) |*elem, i| {
-                    _ = try element_type.serializeToBytes(elem, out[i * elem_byte_length .. (i + 1) * elem_byte_length]);
+                    const elem_ptr = if (comptime @typeInfo(ZT) == .Pointer) elem.* else elem;
+                    _ = try element_type.serializeToBytes(elem_ptr, out[i * elem_byte_length .. (i + 1) * elem_byte_length]);
                 }
                 return elem_byte_length * value.len;
             }
         }
 
-        pub fn deserializeFromBytes(allocator: *std.mem.Allocator, element_type: *ST, data: []const u8, out: []ZT) !void {
+        pub fn deserializeFromBytes(allocator: std.mem.Allocator, element_type: *ST, data: []const u8, out: []ZT) !void {
             if (data.len == 0) {
                 return;
             }
@@ -74,6 +88,31 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             }
         }
 
+        pub fn deserializeFromSlice(arena_allocator: std.mem.Allocator, element_type: *ST, data: []const u8, _: ?[]ZT) ![]ZT {
+            // TODO: consumers should check if the length is correct
+            const offsets = try readOffsetsArrayComposite(arena_allocator, element_type, data);
+            defer arena_allocator.free(offsets);
+            const length = offsets.len;
+            const result = try arena_allocator.alloc(ZT, length);
+
+            for (result, 0..) |*elem, i| {
+                const elem_data = if (i == result.len - 1) data[offsets[i]..] else data[offsets[i]..offsets[i + 1]];
+
+                // ZT could be a slice, in that case we should pass elem itself instead of pointer to pointer
+                // TODO: unit test to confirm the below 2 cases
+
+                if (comptime @typeInfo(ZT) == .Pointer) {
+                    // for pointer, no need to pass in elem_ptr but assignment is needed, we only copy pointer address
+                    result[i] = try element_type.deserializeFromSlice(arena_allocator, elem_data, null);
+                } else {
+                    // for struct, need to pass pointer as out param so that we don't have to allocate there
+                    _ = try element_type.deserializeFromSlice(arena_allocator, elem_data, elem);
+                }
+            }
+
+            return result;
+        }
+
         pub fn valueEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {
             return Array.valueEquals(element_type, a, b);
         }
@@ -83,7 +122,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
         }
 
         // consumer should free the returned array
-        fn readOffsetsArrayComposite(allocator: *std.mem.Allocator, element_type: *ST, data: []const u8) ![]usize {
+        fn readOffsetsArrayComposite(allocator: std.mem.Allocator, element_type: *ST, data: []const u8) ![]usize {
             if (element_type.fixed_size == null) {
                 // variable length
                 return readVariableOffsetsArrayComposite(allocator, data);
@@ -104,7 +143,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
         /// Reads the values of contiguous variable offsets
         /// This function also validates that all offsets are in range.
         /// consumer should free the returned offsets
-        fn readVariableOffsetsArrayComposite(allocator: *std.mem.Allocator, data: []const u8) ![]usize {
+        fn readVariableOffsetsArrayComposite(allocator: std.mem.Allocator, data: []const u8) ![]usize {
             if (data.len == 0) {
                 const no_offset = try allocator.alloc(usize, 0);
                 return no_offset;

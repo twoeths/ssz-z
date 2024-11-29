@@ -15,7 +15,6 @@ const native_endian = builtin.target.cpu.arch.endian();
 /// ZT: zig element type
 pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
     const BlockBytes = ArrayList(u8);
-    // TODO
     const ArrayComposite = @import("./array_composite.zig").withElementTypes(ST, ZT);
 
     const ListCompositeType = struct {
@@ -108,11 +107,11 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
                 return error.InCorrectLen;
             }
 
-            try ArrayComposite.serializeToBytes(self.element_type, value, out);
+            return try ArrayComposite.serializeToBytes(self.element_type, value, out);
         }
 
         pub fn deserializeFromBytes(self: @This(), data: []const u8, out: []ZT) !void {
-            try ArrayComposite.deserializeFromBytes(self.allocator, self.element_type, data, out);
+            try ArrayComposite.deserializeFromBytes(self.allocator.*, self.element_type, data, out);
         }
 
         pub fn equals(self: @This(), a: []const ZT, b: []const ZT) bool {

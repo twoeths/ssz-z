@@ -8,7 +8,7 @@ pub const ByteVectorType = struct {
     allocator: *std.mem.Allocator,
     depth: usize,
     chunk_depth: usize,
-    fixed_size: usize,
+    fixed_size: ?usize,
     min_size: usize,
     max_size: usize,
     max_chunk_count: usize,
@@ -60,7 +60,7 @@ pub const ByteVectorType = struct {
 
     // Serialization + deserialization
     pub fn serializedSize(self: @This(), _: []const u8) usize {
-        return self.fixed_size;
+        return self.fixed_size.?;
     }
 
     pub fn serializeToBytes(self: @This(), value: []const u8, out: []u8) !usize {
@@ -69,7 +69,7 @@ pub const ByteVectorType = struct {
         }
 
         @memcpy(out, value);
-        return self.fixed_size;
+        return self.fixed_size.?;
     }
 
     pub fn deserializeFromBytes(self: @This(), data: []const u8, out: []u8) !void {
@@ -92,7 +92,7 @@ pub const ByteVectorType = struct {
             return error.InCorrectLen;
         }
 
-        const result = try arenaAllocator.alloc(u8, self.fixed_size);
+        const result = try arenaAllocator.alloc(u8, self.fixed_size.?);
         @memcpy(result, slice);
         return result;
     }
@@ -102,7 +102,7 @@ pub const ByteVectorType = struct {
             return false;
         }
 
-        return std.mem.allEqual(u8, a, b);
+        return std.mem.eql(u8, a, b);
     }
 
     pub fn clone(self: @This(), value: []const u8, out: []u8) !void {
