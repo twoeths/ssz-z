@@ -1,4 +1,5 @@
 const std = @import("std");
+const Scanner = std.json.Scanner;
 const Allocator = std.mem.Allocator;
 const expect = std.testing.expect;
 const builtin = @import("builtin");
@@ -87,6 +88,28 @@ pub fn createUintType(comptime num_bytes: usize) type {
             return result;
         }
 
+        /// Json
+        /// public function
+        pub fn fromJson(_: @This(), arena_allocator: Allocator, json: []const u8) !*T {
+            const result = try arena_allocator.create(T);
+            result.* = try sliceToInt(T, json);
+            return result;
+        }
+
+        /// an implementation for parent types
+        pub fn deserializeFromJson(_: @This(), arena_allocator: Allocator, source: *Scanner, out: ?*T) !*T {
+            const result = if (out != null) out.? else try arena_allocator.create(T);
+            const value = try source.next();
+            try switch (value) {
+                .number => |v| {
+                    result.* = try sliceToInt(T, v);
+                },
+                else => error.InvalidJson,
+            };
+
+            return result;
+        }
+
         pub fn equals(_: @This(), a: *const T, b: *const T) bool {
             return a.* == b.*;
         }
@@ -100,6 +123,23 @@ pub fn createUintType(comptime num_bytes: usize) type {
     };
 }
 
+/// copy from std.json.static.zig
+fn sliceToInt(comptime T: type, slice: []const u8) !T {
+    if (isNumberFormattedLikeAnInteger(slice))
+        return std.fmt.parseInt(T, slice, 10);
+    // Try to coerce a float to an integer.
+    const float = try std.fmt.parseFloat(f128, slice);
+    if (@round(float) != float) return error.InvalidNumber;
+    if (float > std.math.maxInt(T) or float < std.math.minInt(T)) return error.Overflow;
+    return @as(T, @intCast(@as(i128, @intFromFloat(float))));
+}
+
+/// copy from std.json.scanner.zig
+pub fn isNumberFormattedLikeAnInteger(value: []const u8) bool {
+    if (std.mem.eql(u8, value, "-0")) return false;
+    return std.mem.indexOfAny(u8, value, ".eE") == null;
+}
+
 test "createUintType" {
     const UintType = createUintType(8);
     const uintType = try UintType.init();
@@ -110,6 +150,17 @@ test "createUintType" {
     // std.debug.print("uintType.hashTreeRoot(0xffffffffffffffff) {any}\n", .{root});
 
     // TODO: more unit tests: serialize + deserialize, clone, make sure can mutate output values
+    // var out: [8]u8 = undefined;
+    // 0xffffffffffffffff is too big for json
+    // TODO: implement toJson and test again
+    // const valueToJson: u64 = 1;
+    // _ = try uintType.serializeToBytes(&valueToJson, out[0..]);
+
+    // const allocator = std.testing.allocator;
+    // var arena = std.heap.ArenaAllocator.init(allocator);
+    // defer arena.deinit();
+    // const valueFromJson = try uintType.fromJson(arena.allocator(), out[0..]);
+    // try expect(valueFromJson.* == valueToJson);
 }
 
 // we can use below code for hashTreeRoot() implementation above
