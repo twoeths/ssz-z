@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const Scanner = std.json.Scanner;
 const maxChunksToDepth = @import("hash").maxChunksToDepth;
 const merkleize = @import("hash").merkleizeBlocksBytes;
 const sha256Hash = @import("hash").sha256Hash;
@@ -101,6 +102,26 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
             return try ArrayBasic.deserializeFromSlice(arenaAllocator, self.element_type, slice, out);
         }
 
+        /// TODO: deduplicate with vector_basic.zig
+        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) ![]ZT {
+            var source = Scanner.initCompleteInput(arena_allocator, json);
+            defer source.deinit();
+            const result = try self.deserializeFromJson(arena_allocator, &source, null);
+            const end_document_token = try source.next();
+            switch (end_document_token) {
+                .end_of_document => {},
+                else => return error.InvalidJson,
+            }
+            return result;
+        }
+
+        /// Implementation for parent
+        /// Consumer need to free the memory
+        /// out parameter is unused because parent does not allocate, just to conform to the api
+        pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, out: ?[]ZT) ![]ZT {
+            return try ArrayBasic.deserializeFromJson(arena_allocator, self.element_type, source, null, out);
+        }
+
         pub fn equals(self: @This(), a: []const ZT, b: []const ZT) bool {
             return ArrayBasic.valueEquals(self.element_type, a, b);
         }
@@ -167,5 +188,39 @@ test "deserializeFromBytes" {
 
         // equals
         try std.testing.expect(listType.equals(value[0..], cloned[0..]));
+    }
+}
+
+test "deserializeFromJson" {
+    var allocator = std.testing.allocator;
+    try initZeroHash(&allocator, 32);
+    defer deinitZeroHash();
+
+    // uint of 8 bytes = u64
+    const UintType = @import("./uint.zig").createUintType(8);
+    const ListBasicType = createListBasicType(UintType, u64);
+    var uintType = try UintType.init();
+    var listType = try ListBasicType.init(&allocator, &uintType, 4, 2);
+    defer uintType.deinit();
+    defer listType.deinit();
+
+    const json = "[100000, 200000, 300000, 400000]";
+    const expected = ([_]u64{ 100000, 200000, 300000, 400000 })[0..];
+
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+
+    const result = try listType.fromJson(arena.allocator(), json);
+    try std.testing.expectEqual(result.len, expected.len);
+    for (result, expected) |a, b| {
+        try std.testing.expectEqual(a, b);
+    }
+
+    // missing "]" at the end
+    if (listType.fromJson(arena.allocator(), "[100000, 200000, 300000")) |_| {
+        unreachable;
+    } else |err| switch (err) {
+        error.UnexpectedEndOfInput => {},
+        else => unreachable,
     }
 }
