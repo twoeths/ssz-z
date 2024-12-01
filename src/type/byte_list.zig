@@ -1,4 +1,6 @@
 const std = @import("std");
+const Scanner = std.json.Scanner;
+const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const merkleize = @import("hash").merkleizeBlocksBytes;
 const sha256Hash = @import("hash").sha256Hash;
@@ -83,7 +85,39 @@ pub fn createByteListType(comptime limit_bytes: usize) type {
             std.mem.copyForwards(u8, out, data);
         }
 
+        // TODO: deserializeFromSlice
+
         // TODO: serializeToBytes
+
+        /// fromJson
+        /// public function
+        pub fn fromJson(_: @This(), arena_allocator: Allocator, json: []const u8) ![]u8 {
+            const len = if (json.len >= 2 and (json[0] == '0' and (json[1] == 'x' or json[1] == 'X'))) (json.len - 2) / 2 else json.len / 2;
+            const result = try arena_allocator.alloc(u8, len);
+            try fromHex(json, result);
+            return result;
+        }
+
+        //// Implementation for parent
+        /// Consumer need to free the memory
+        /// out parameter is unused because parent does not allocate, just to conform to the api
+        pub fn deserializeFromJson(_: @This(), arena_allocator: Allocator, source: *Scanner, _: ?[]u8) ![]u8 {
+            const value = try source.next();
+            try switch (value) {
+                .string => |v| {
+                    var length: usize = undefined;
+                    if (v.len >= 2 and (v[0] == '0' and (v[1] == 'x' or v[1] == 'X'))) {
+                        length = (v.len - 2) / 2;
+                    } else {
+                        length = v.len / 2;
+                    }
+                    const result = try arena_allocator.alloc(u8, length);
+                    try fromHex(v, result);
+                    return result;
+                },
+                else => error.InvalidJson,
+            };
+        }
 
         pub fn equals(_: @This(), a: []const u8, b: []const u8) bool {
             return std.mem.allEqual(u8, a, b);

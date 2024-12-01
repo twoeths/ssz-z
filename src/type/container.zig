@@ -202,12 +202,6 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         }
 
         /// a recursive implementation for parent types or fromJson
-        /// source is likely to be std.json.Scanner, something like
-        /// ###
-        /// var scanner = Scanner.initCompleteInput(testing.allocator, "{\"foo\": 123}\n");
-        /// defer scanner.deinit();
-        /// ###
-        ///
         pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, out: ?*ZT) !*ZT {
             var out2 = if (out != null) out.? else try arena_allocator.create(ZT);
 
