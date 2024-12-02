@@ -1,4 +1,7 @@
 const std = @import("std");
+const Scanner = std.json.Scanner;
+const Token = std.json.Token;
+const ArrayList = std.ArrayList;
 const array = @import("./array.zig").withElementTypes;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
@@ -111,6 +114,49 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             }
 
             return result;
+        }
+
+        /// same to deserializeFromSlice but this comes from a json string
+        /// the disadventage is we don't know the length of the array, so we have to use ArrayList
+        /// out parameter is not used, consumer needs to free the memory
+        pub fn deserializeFromJson(arena_allocator: std.mem.Allocator, element_type: *ST, source: *Scanner, expected_len: ?usize, _: ?[]ZT) ![]ZT {
+            // validate start array token "["
+            const start_array_token = try source.next();
+            if (start_array_token != Token.array_begin) {
+                return error.InvalidJson;
+            }
+
+            // Typical array, handle same to std.json.static.zig
+            var arraylist = ArrayList(ZT).init(arena_allocator);
+            while (true) {
+                switch (try source.peekNextTokenType()) {
+                    .array_end => {
+                        _ = try source.next();
+                        break;
+                    },
+                    else => {},
+                }
+
+                try arraylist.ensureUnusedCapacity(1);
+                if (comptime @typeInfo(ZT) == .Pointer) {
+                    const elem_ptr = try element_type.deserializeFromJson(arena_allocator, source, null);
+                    arraylist.appendAssumeCapacity(elem_ptr);
+                } else {
+                    const elem_ptr = try element_type.deserializeFromJson(arena_allocator, source, null);
+                    // this means a copy of data is needed, but don't know how to avoid this
+                    arraylist.appendAssumeCapacity(elem_ptr.*);
+                }
+
+                if (expected_len != null and arraylist.items.len > expected_len.?) {
+                    return error.InCorrectLen;
+                }
+            }
+
+            if (expected_len != null and arraylist.items.len != expected_len.?) {
+                return error.InCorrectLen;
+            }
+
+            return arraylist.toOwnedSlice();
         }
 
         pub fn valueEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {

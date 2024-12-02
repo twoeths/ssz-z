@@ -102,6 +102,7 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
             return try ArrayBasic.deserializeFromSlice(arenaAllocator, self.element_type, slice, out);
         }
 
+        /// public api
         /// TODO: deduplicate with vector_basic.zig
         pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) ![]ZT {
             var source = Scanner.initCompleteInput(arena_allocator, json);

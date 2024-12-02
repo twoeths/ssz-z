@@ -60,6 +60,8 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return result;
         }
 
+        /// consumer need to free the memory
+        /// out parameter is unused because it's always allocated inside the function
         pub fn deserializeFromJson(arena_allocator: Allocator, element_type: *ST, source: *Scanner, expected_len: ?usize, _: ?[]ZT) ![]ZT {
             // validate start array token "["
             const start_array_token = try source.next();
@@ -79,6 +81,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
                 }
 
                 try arraylist.ensureUnusedCapacity(1);
+                // TODO: we can also allocate ZT here, and pass its address to deserializeFromJson
                 const elem_ptr = try element_type.deserializeFromJson(arena_allocator, source, null);
                 arraylist.appendAssumeCapacity(elem_ptr.*);
 
