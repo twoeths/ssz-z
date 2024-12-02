@@ -61,7 +61,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return @This(){
                 .allocator = allocator,
                 .ssz_fields = ssz_fields,
-                .blocks_bytes = try allocator.alloc(u8, 32 * blocks_bytes_len),
+                .blocks_bytes = try allocator.alloc(u8, blocks_bytes_len),
                 .min_size = min_size,
                 .max_size = max_size,
                 .fixed_size = fixed_size,
