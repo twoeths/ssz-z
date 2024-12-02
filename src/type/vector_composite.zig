@@ -172,6 +172,6 @@ test "fromJson - VectorCompositeType of 4 roots" {
     var root = [_]u8{0} ** 32;
     try vectorCompositeType.hashTreeRoot(value, root[0..]);
 
-    // const rootHex = try toRootHex(root[0..]);
-    // try std.testing.expectEqualSlices(u8, "0x56019bafbc63461b73e21c6eae0c62e8d5b8e05cb0ac065777dc238fcf9604e6", rootHex);
+    const rootHex = try toRootHex(root[0..]);
+    try std.testing.expectEqualSlices(u8, "0x56019bafbc63461b73e21c6eae0c62e8d5b8e05cb0ac065777dc238fcf9604e6", rootHex);
 }

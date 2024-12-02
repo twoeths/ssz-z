@@ -18,8 +18,8 @@ pub const ByteVectorType = struct {
     block_bytes: []u8,
 
     pub fn init(allocator: *std.mem.Allocator, length_bytes: usize) !@This() {
-        const max_chunk_count: usize = (length_bytes + 31 / 32);
-        const chunk_depth = maxChunksToDepth(length_bytes);
+        const max_chunk_count: usize = (length_bytes + 31) / 32;
+        const chunk_depth = maxChunksToDepth(max_chunk_count);
         const depth = chunk_depth;
         const fixed_size = length_bytes;
         const min_size = fixed_size;
