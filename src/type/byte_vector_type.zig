@@ -5,6 +5,7 @@ const maxChunksToDepth = @import("hash").maxChunksToDepth;
 const merkleize = @import("hash").merkleizeBlocksBytes;
 const sha256Hash = @import("hash").sha256Hash;
 const fromHex = @import("util").fromHex;
+const FromHexError = @import("hash").FromHexError;
 
 pub const ByteVectorType = struct {
     allocator: *std.mem.Allocator,
@@ -101,7 +102,7 @@ pub const ByteVectorType = struct {
 
     /// fromJson
     /// public function
-    pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) ![]u8 {
+    pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) FromHexError![]u8 {
         const result = try arena_allocator.alloc(u8, self.fixed_size.?);
         try fromHex(json, result);
         return result;

@@ -5,6 +5,7 @@ const ArrayList = std.ArrayList;
 const array = @import("./array.zig").withElementTypes;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
+const JsonError = @import("./common.zig").JsonError;
 
 /// ST: ssz element type
 /// ZT: zig type
@@ -119,7 +120,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
         /// same to deserializeFromSlice but this comes from a json string
         /// the disadventage is we don't know the length of the array, so we have to use ArrayList
         /// out parameter is not used, consumer needs to free the memory
-        pub fn deserializeFromJson(arena_allocator: std.mem.Allocator, element_type: *ST, source: *Scanner, expected_len: ?usize, _: ?[]ZT) ![]ZT {
+        pub fn deserializeFromJson(arena_allocator: std.mem.Allocator, element_type: *ST, source: *Scanner, expected_len: ?usize, _: ?[]ZT) JsonError![]ZT {
             // validate start array token "["
             const start_array_token = try source.next();
             if (start_array_token != Token.array_begin) {

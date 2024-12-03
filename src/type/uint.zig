@@ -4,6 +4,7 @@ const Allocator = std.mem.Allocator;
 const expect = std.testing.expect;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
+const JsonError = @import("./common.zig").JsonError;
 
 pub fn createUintType(comptime num_bytes: usize) type {
     if (num_bytes != 2 and num_bytes != 4 and num_bytes != 8) {
@@ -90,14 +91,14 @@ pub fn createUintType(comptime num_bytes: usize) type {
 
         /// Json
         /// public function
-        pub fn fromJson(_: @This(), arena_allocator: Allocator, json: []const u8) !*T {
+        pub fn fromJson(_: @This(), arena_allocator: Allocator, json: []const u8) JsonError!*T {
             const result = try arena_allocator.create(T);
             result.* = try sliceToInt(T, json);
             return result;
         }
 
         /// an implementation for parent types
-        pub fn deserializeFromJson(_: @This(), arena_allocator: Allocator, source: *Scanner, out: ?*T) !*T {
+        pub fn deserializeFromJson(_: @This(), arena_allocator: Allocator, source: *Scanner, out: ?*T) JsonError!*T {
             const result = if (out != null) out.? else try arena_allocator.create(T);
             const value = try source.next();
             try switch (value) {

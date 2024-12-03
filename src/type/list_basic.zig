@@ -11,6 +11,7 @@ const deinitZeroHash = @import("hash").deinitZeroHash;
 const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
+const JsonError = @import("./common.zig").JsonError;
 
 /// List: ordered variable-length homogeneous collection, limited to N values
 /// ST: ssz element type
@@ -104,7 +105,7 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
 
         /// public api
         /// TODO: deduplicate with vector_basic.zig
-        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) ![]ZT {
+        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
             var source = Scanner.initCompleteInput(arena_allocator, json);
             defer source.deinit();
             const result = try self.deserializeFromJson(arena_allocator, &source, null);
@@ -119,7 +120,7 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
         /// Implementation for parent
         /// Consumer need to free the memory
         /// out parameter is unused because parent does not allocate, just to conform to the api
-        pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, out: ?[]ZT) ![]ZT {
+        pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, out: ?[]ZT) JsonError![]ZT {
             return try ArrayBasic.deserializeFromJson(arena_allocator, self.element_type, source, null, out);
         }
 

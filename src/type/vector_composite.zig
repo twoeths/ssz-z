@@ -11,6 +11,7 @@ const deinitZeroHash = @import("hash").deinitZeroHash;
 const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
+const JsonError = @import("./common.zig").JsonError;
 
 /// Vector: Ordered fixed-length homogeneous collection, with N values
 ///
@@ -113,7 +114,7 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
 
         /// public api
         /// TODO: deduplicate with vector_basic.zig
-        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) ![]ZT {
+        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
             var source = Scanner.initCompleteInput(arena_allocator, json);
             defer source.deinit();
             const result = try self.deserializeFromJson(arena_allocator, &source, null);
@@ -126,7 +127,7 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
         }
 
         /// out parameter is not used because memory is always allocated inside the function
-        pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, _: ?[]ZT) ![]ZT {
+        pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, _: ?[]ZT) JsonError![]ZT {
             return try ArrayComposite.deserializeFromJson(arena_allocator, self.element_type, source, self.default_len, null);
         }
 

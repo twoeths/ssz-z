@@ -4,6 +4,7 @@ const Scanner = std.json.Scanner;
 const ArrayList = std.ArrayList;
 const Token = std.json.Token;
 const array = @import("./array.zig").withElementTypes;
+const JsonError = @import("./common.zig").JsonError;
 
 /// ST: ssz element type
 /// ZT: zig type
@@ -24,7 +25,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return byte_len;
         }
 
-        pub fn deserializeFromBytes(element_type: *ST, data: []const u8, out: []ZT) !void {
+        pub fn deserializeFromBytes(element_type: *ST, data: []const u8, out: []ZT) JsonError!void {
             const elem_byte_length = element_type.byte_length;
             if (data.len % elem_byte_length != 0) {
                 return error.InCorrectLen;

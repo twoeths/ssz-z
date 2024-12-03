@@ -7,6 +7,7 @@ const merkleize = @import("hash").merkleizeBlocksBytes;
 const HashFn = @import("hash").HashFn;
 const sha256Hash = @import("hash").sha256Hash;
 const toRootHex = @import("util").toRootHex;
+const JsonError = @import("./common.zig").JsonError;
 
 const BytesRange = struct {
     start: usize,
@@ -15,6 +16,7 @@ const BytesRange = struct {
 
 // create a ssz type from type of an ssz object
 // type of zig type will be used once and checked inside hashTreeRoot() function
+// TODO: define error types similar to JsonError for all apis
 pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn) type {
     const zig_fields_info = @typeInfo(ZT).Struct.fields;
     const max_chunk_count = zig_fields_info.len;
@@ -189,7 +191,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         }
 
         /// public function for consumers
-        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) !*ZT {
+        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError!*ZT {
             var source = Scanner.initCompleteInput(arena_allocator, json);
             defer source.deinit();
             const zt = try self.deserializeFromJson(arena_allocator, &source, null);
@@ -202,7 +204,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         }
 
         /// a recursive implementation for parent types or fromJson
-        pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, out: ?*ZT) !*ZT {
+        pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, out: ?*ZT) JsonError!*ZT {
             var out2 = if (out != null) out.? else try arena_allocator.create(ZT);
 
             // validate begin token "{"

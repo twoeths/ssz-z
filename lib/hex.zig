@@ -2,6 +2,12 @@ const std = @import("std");
 
 var buffer = [_]u8{0} ** 66;
 
+pub const FromHexError = error{
+    InvalidHexLength,
+    InvalidOutputLength,
+    InvalidHexDigit,
+};
+
 /// convert to root with "0x" prefix
 /// note that the returned value is reusable and changed in the next called
 pub fn toRootHex(root: []const u8) ![]u8 {

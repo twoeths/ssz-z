@@ -8,6 +8,7 @@ const fromHex = @import("util").fromHex;
 const toRootHex = @import("util").toRootHex;
 const initZeroHash = @import("hash").initZeroHash;
 const deinitZeroHash = @import("hash").deinitZeroHash;
+const JsonError = @import("./common.zig").JsonError;
 
 /// Vector: Ordered fixed-length homogeneous collection, with N values
 /// ST: ssz element type
@@ -103,7 +104,7 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
         /// fromJson
         /// public api
         /// TODO: deduplicate with list_basic.zig
-        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) ![]ZT {
+        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
             var source = Scanner.initCompleteInput(arena_allocator, json);
             defer source.deinit();
             const result = try self.deserializeFromJson(arena_allocator, &source, null);
@@ -118,7 +119,7 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
         /// Implementation for parent
         /// Consumer need to free the memory
         /// out parameter is unused because parent does not allocate, just to conform to the api
-        pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, out: ?[]ZT) ![]ZT {
+        pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, out: ?[]ZT) JsonError![]ZT {
             return try ArrayBasic.deserializeFromJson(arena_allocator, self.element_type, source, self.length, out);
         }
 
