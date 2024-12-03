@@ -175,3 +175,53 @@ test "fromJson - VectorCompositeType of 4 roots" {
     const rootHex = try toRootHex(root[0..]);
     try std.testing.expectEqualSlices(u8, "0x56019bafbc63461b73e21c6eae0c62e8d5b8e05cb0ac065777dc238fcf9604e6", rootHex);
 }
+
+test "fromJson - VectorCompositeType of 4 ContainerType({a: uint64Type, b: uint64Type})" {
+    var allocator = std.testing.allocator;
+    const UintType = @import("./uint.zig").createUintType(8);
+    const uintType = try UintType.init();
+    defer uintType.deinit();
+
+    const SszType = struct {
+        a: UintType,
+        b: UintType,
+    };
+    const ZigType = struct {
+        a: u64,
+        b: u64,
+    };
+
+    const ContainerType = @import("./container.zig").createContainerType(SszType, ZigType, sha256Hash);
+    var containerType = try ContainerType.init(&allocator, SszType{ .a = uintType, .b = uintType });
+    defer containerType.deinit();
+
+    const VectorCompositeType = createVectorCompositeType(ContainerType, ZigType);
+    var vectorCompositeType = try VectorCompositeType.init(&allocator, &containerType, 4);
+    defer vectorCompositeType.deinit();
+    const json =
+        \\[
+        \\{"a": 0, "b": 0},
+        \\{"a": 123456, "b": 654321},
+        \\{"a": 234567, "b": 765432},
+        \\{"a": 345678, "b": 876543}
+        \\]
+    ;
+
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const value = try vectorCompositeType.fromJson(arena.allocator(), json);
+    try std.testing.expect(value.len == 4);
+    try std.testing.expectEqual(0, value[0].a);
+    try std.testing.expectEqual(0, value[0].b);
+    try std.testing.expectEqual(123456, value[1].a);
+    try std.testing.expectEqual(654321, value[1].b);
+    try std.testing.expectEqual(234567, value[2].a);
+    try std.testing.expectEqual(765432, value[2].b);
+    try std.testing.expectEqual(345678, value[3].a);
+    try std.testing.expectEqual(876543, value[3].b);
+    var root = [_]u8{0} ** 32;
+    try vectorCompositeType.hashTreeRoot(value, root[0..]);
+
+    const rootHex = try toRootHex(root[0..]);
+    try std.testing.expectEqualSlices(u8, "0xb1a797eb50654748ba239010edccea7b46b55bf740730b700684f48b0c478372", rootHex);
+}
