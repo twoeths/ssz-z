@@ -61,6 +61,10 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return result;
         }
 
+        pub fn fromJson(self: anytype, arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
+            return Array.fromJson(self, arena_allocator, json);
+        }
+
         /// consumer need to free the memory
         /// out parameter is unused because it's always allocated inside the function
         pub fn deserializeFromJson(arena_allocator: Allocator, element_type: *ST, source: *Scanner, expected_len: ?usize, _: ?[]ZT) ![]ZT {

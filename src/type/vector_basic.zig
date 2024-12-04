@@ -103,17 +103,8 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
 
         /// fromJson
         /// public api
-        /// TODO: deduplicate with list_basic.zig
         pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
-            var source = Scanner.initCompleteInput(arena_allocator, json);
-            defer source.deinit();
-            const result = try self.deserializeFromJson(arena_allocator, &source, null);
-            const end_document_token = try source.next();
-            switch (end_document_token) {
-                .end_of_document => {},
-                else => return error.InvalidJson,
-            }
-            return result;
+            return ArrayBasic.fromJson(self, arena_allocator, json);
         }
 
         /// Implementation for parent

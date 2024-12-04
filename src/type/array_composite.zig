@@ -117,6 +117,10 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return result;
         }
 
+        pub fn fromJson(self: anytype, arena_allocator: std.mem.Allocator, json: []const u8) JsonError![]ZT {
+            return Array.fromJson(self, arena_allocator, json);
+        }
+
         /// same to deserializeFromSlice but this comes from a json string
         /// the disadventage is we don't know the length of the array, so we have to use ArrayList
         /// out parameter is not used, consumer needs to free the memory
