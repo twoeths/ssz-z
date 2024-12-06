@@ -192,10 +192,10 @@ test "fromJson - VectorCompositeType of 4 ContainerType({a: uint64Type, b: uint6
     defer vectorCompositeType.deinit();
     const json =
         \\[
-        \\{"a": 0, "b": 0},
-        \\{"a": 123456, "b": 654321},
-        \\{"a": 234567, "b": 765432},
-        \\{"a": 345678, "b": 876543}
+        \\{"a": "0", "b": "0"},
+        \\{"a": "123456", "b": "654321"},
+        \\{"a": "234567", "b": "765432"},
+        \\{"a": "345678", "b": "876543"}
         \\]
     ;
 

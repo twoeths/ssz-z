@@ -197,7 +197,7 @@ test "deserializeFromJson" {
     defer uintType.deinit();
     defer listType.deinit();
 
-    const json = "[100000, 200000, 300000, 400000]";
+    const json = "[\"100000\", \"200000\", \"300000\", \"400000\"]";
     const expected = ([_]u64{ 100000, 200000, 300000, 400000 })[0..];
 
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -210,7 +210,7 @@ test "deserializeFromJson" {
     }
 
     // missing "]" at the end
-    if (listType.fromJson(arena.allocator(), "[100000, 200000, 300000")) |_| {
+    if (listType.fromJson(arena.allocator(), "[\"100000\", \"200000\", \"300000\"")) |_| {
         unreachable;
     } else |err| switch (err) {
         error.UnexpectedEndOfInput => {},

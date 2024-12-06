@@ -248,13 +248,12 @@ test "ListCompositeType - element type is ContainerType" {
     }
 
     // fromJson
-    // fromJson
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     const json =
         \\[
-        \\{"a": 0, "b": 0},
-        \\{"a": 123456, "b": 654321}
+        \\{"a": "0", "b": "0"},
+        \\{"a": "123456", "b": "654321"}
         \\]
     ;
     const value = try listType.fromJson(arena.allocator(), json);

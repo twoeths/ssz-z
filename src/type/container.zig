@@ -370,7 +370,7 @@ test "basic ContainerType {x: uint, y:uint}" {
     try expect(obj3.y == obj.y);
 
     // fromJson
-    const json = "{ \"x\": 18446744073709551615, \"y\": 0 }";
+    const json = "{ \"x\": \"18446744073709551615\", \"y\": \"0\" }";
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     const obj4 = try containerType.fromJson(arena.allocator(), json);
@@ -449,7 +449,7 @@ test "ContainerType with embedded struct" {
     try expect(obj.a.x != obj3.a.x);
 
     // fromJson
-    const json = "{ \"a\": { \"x\": 18446744073709551615, \"y\": 0 }, \"b\": { \"x\": 0, \"y\": 18446744073709551615 } }";
+    const json = "{ \"a\": { \"x\": \"18446744073709551615\", \"y\": \"0\" }, \"b\": { \"x\": \"0\", \"y\": \"18446744073709551615\" } }";
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     const obj4 = try containerType1.fromJson(arena.allocator(), json);

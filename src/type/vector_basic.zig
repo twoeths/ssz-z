@@ -192,7 +192,7 @@ test "deserializeFromJson" {
     defer uintType.deinit();
     defer vectorType.deinit();
 
-    const json = "[100000, 200000, 300000, 400000]";
+    const json = "[\"100000\", \"200000\", \"300000\", \"400000\"]";
     const expected = ([_]u64{ 100000, 200000, 300000, 400000 })[0..];
 
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -204,7 +204,7 @@ test "deserializeFromJson" {
         try std.testing.expectEqual(a, b);
     }
 
-    if (vectorType.fromJson(arena.allocator(), "[100000, 200000, 300000]")) |_| {
+    if (vectorType.fromJson(arena.allocator(), "[\"100000\", \"200000\", \"300000\"]")) |_| {
         unreachable;
     } else |err| switch (err) {
         error.InCorrectLen => {},

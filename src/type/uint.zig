@@ -102,7 +102,8 @@ pub fn createUintType(comptime num_bytes: usize) type {
             const result = if (out != null) out.? else try arena_allocator.create(T);
             const value = try source.next();
             try switch (value) {
-                .number => |v| {
+                // uintN is mapped to string in consensus spec https://github.com/ethereum/consensus-specs/blob/dev/ssz/simple-serialize.md#json-mapping
+                .string => |v| {
                     result.* = try sliceToInt(T, v);
                 },
                 else => error.InvalidJson,
