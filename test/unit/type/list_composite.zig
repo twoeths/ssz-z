@@ -26,7 +26,7 @@ test "ListCompositeType - element type ByteVectorType" {
     };
 
     var allocator = std.testing.allocator;
-    var byte_vector_type = try ByteVectorType.init(&allocator, 32);
+    var byte_vector_type = try ByteVectorType.init(allocator, 32);
     defer byte_vector_type.deinit();
 
     const ListCompositeType = createListCompositeType(ByteVectorType, []u8);

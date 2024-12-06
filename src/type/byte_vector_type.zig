@@ -8,7 +8,7 @@ const fromHex = @import("util").fromHex;
 const FromHexError = @import("hash").FromHexError;
 
 pub const ByteVectorType = struct {
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     depth: usize,
     chunk_depth: usize,
     fixed_size: ?usize,
@@ -18,7 +18,7 @@ pub const ByteVectorType = struct {
     // this should always be a multiple of 64 bytes
     block_bytes: []u8,
 
-    pub fn init(allocator: *std.mem.Allocator, length_bytes: usize) !@This() {
+    pub fn init(allocator: std.mem.Allocator, length_bytes: usize) !@This() {
         const max_chunk_count: usize = (length_bytes + 31) / 32;
         const chunk_depth = maxChunksToDepth(max_chunk_count);
         const depth = chunk_depth;

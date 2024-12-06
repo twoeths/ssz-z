@@ -21,13 +21,13 @@ pub fn createByteListType(comptime limit_bytes: usize) type {
     const BlockBytes = ArrayList(u8);
 
     const ByteListType = struct {
-        allocator: *std.mem.Allocator,
+        allocator: std.mem.Allocator,
         // this should always be a multiple of 64 bytes
         block_bytes: BlockBytes,
         mix_in_length_block_bytes: []u8,
 
-        pub fn init(allocator: *std.mem.Allocator, init_capacity: usize) !@This() {
-            return @This(){ .allocator = allocator, .block_bytes = try BlockBytes.initCapacity(allocator.*, init_capacity), .mix_in_length_block_bytes = try allocator.alloc(u8, 64) };
+        pub fn init(allocator: std.mem.Allocator, init_capacity: usize) !@This() {
+            return @This(){ .allocator = allocator, .block_bytes = try BlockBytes.initCapacity(allocator, init_capacity), .mix_in_length_block_bytes = try allocator.alloc(u8, 64) };
         }
 
         pub fn deinit(self: @This()) void {
@@ -140,7 +140,7 @@ test "sanity" {
     try initZeroHash(&allocator, 32);
     defer deinitZeroHash();
     const ByteList = createByteListType(256);
-    var byteList = try ByteList.init(&allocator, 256);
+    var byteList = try ByteList.init(allocator, 256);
     defer byteList.deinit();
 
     const TestCase = struct {

@@ -137,7 +137,7 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
 test "fromJson - VectorCompositeType of 4 roots" {
     var allocator = std.testing.allocator;
     const ByteVectorType = @import("./byte_vector_type.zig").ByteVectorType;
-    var byteVectorType = try ByteVectorType.init(&allocator, 32);
+    var byteVectorType = try ByteVectorType.init(allocator, 32);
     defer byteVectorType.deinit();
 
     const VectorCompositeType = createVectorCompositeType(ByteVectorType, []u8);

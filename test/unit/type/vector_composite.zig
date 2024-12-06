@@ -21,7 +21,7 @@ test "VectorCompositeType of Root" {
 
     var allocator = std.testing.allocator;
     const ByteVectorType = @import("ssz").ByteVectorType;
-    var byte_vector_type = try ByteVectorType.init(&allocator, 32);
+    var byte_vector_type = try ByteVectorType.init(allocator, 32);
     defer byte_vector_type.deinit();
 
     const VectorCompositeType = createVectorCompositeType(ByteVectorType, []u8);

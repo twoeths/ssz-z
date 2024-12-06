@@ -148,7 +148,7 @@ test "ListCompositeType - element type ByteVectorType" {
     try initZeroHash(&allocator, 32);
     defer deinitZeroHash();
     const ByteVectorType = @import("./byte_vector_type.zig").ByteVectorType;
-    var byteVectorType = try ByteVectorType.init(&allocator, 32);
+    var byteVectorType = try ByteVectorType.init(allocator, 32);
     defer byteVectorType.deinit();
 
     const ListCompositeType = createListCompositeType(ByteVectorType, []u8);
