@@ -23,7 +23,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
     const native_endian = @import("builtin").target.cpu.arch.endian();
 
     const ContainerType = struct {
-        allocator: *Allocator,
+        allocator: Allocator,
         // TODO: *ST to avoid copy
         ssz_fields: ST,
         // a sha256 block is 64 byte
@@ -34,7 +34,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         fixed_end: usize,
         variable_field_count: usize,
 
-        pub fn init(allocator: *Allocator, ssz_fields: ST) !@This() {
+        pub fn init(allocator: Allocator, ssz_fields: ST) !@This() {
             var min_size: usize = 0;
             var max_size: usize = 0;
             var fixed_size: ?usize = 0;
@@ -336,7 +336,7 @@ test "basic ContainerType {x: uint, y:uint}" {
         y: u64,
     };
     const ContainerType = createContainerType(SszType, ZigType, sha256Hash);
-    var containerType = try ContainerType.init(&allocator, SszType{
+    var containerType = try ContainerType.init(allocator, SszType{
         .x = uintType,
         .y = uintType,
     });
@@ -392,7 +392,7 @@ test "ContainerType with embedded struct" {
         y: u64,
     };
     const ContainerType0 = createContainerType(SszType0, ZigType0, sha256Hash);
-    const containerType0 = try ContainerType0.init(&allocator, SszType0{
+    const containerType0 = try ContainerType0.init(allocator, SszType0{
         .x = uintType,
         .y = uintType,
     });
@@ -407,7 +407,7 @@ test "ContainerType with embedded struct" {
         b: ZigType0,
     };
     const ContainerType1 = createContainerType(SszType1, ZigType1, sha256Hash);
-    var containerType1 = try ContainerType1.init(&allocator, SszType1{
+    var containerType1 = try ContainerType1.init(allocator, SszType1{
         .a = containerType0,
         .b = containerType0,
     });

@@ -6,7 +6,7 @@ const sha256Hash = @import("hash").sha256Hash;
 const TestCase = @import("common.zig").TypeTestCase;
 
 test "ContainerType with 2 uints" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const UintType = createUintType(8);
     const uintType = try UintType.init();
     defer uintType.deinit();
@@ -21,7 +21,7 @@ test "ContainerType with 2 uints" {
     };
 
     const ContainerType = createContainerType(SszType, ZigType, sha256Hash);
-    var containerType = try ContainerType.init(&allocator, SszType{
+    var containerType = try ContainerType.init(allocator, SszType{
         .a = uintType,
         .b = uintType,
     });
@@ -77,7 +77,7 @@ test "ContainerType with ListBasicType(uint64, 128) and uint64" {
     };
 
     const ContainerType = createContainerType(SszType, ZigType, sha256Hash);
-    var containerType = try ContainerType.init(&allocator, SszType{
+    var containerType = try ContainerType.init(allocator, SszType{
         .a = listBasicType,
         .b = uintType,
     });

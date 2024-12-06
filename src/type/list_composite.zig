@@ -198,7 +198,7 @@ test "ListCompositeType - element type is ContainerType" {
 
     const uintType = try UintType.init();
     defer uintType.deinit();
-    var elementType = try SSZContainerType.init(&allocator, .{ .a = uintType, .b = uintType });
+    var elementType = try SSZContainerType.init(allocator, .{ .a = uintType, .b = uintType });
     defer elementType.deinit();
 
     var listType = try ListCompositeType.init(&allocator, &elementType, 128, 64);

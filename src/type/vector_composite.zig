@@ -184,7 +184,7 @@ test "fromJson - VectorCompositeType of 4 ContainerType({a: uint64Type, b: uint6
     };
 
     const ContainerType = @import("./container.zig").createContainerType(SszType, ZigType, sha256Hash);
-    var containerType = try ContainerType.init(&allocator, SszType{ .a = uintType, .b = uintType });
+    var containerType = try ContainerType.init(allocator, SszType{ .a = uintType, .b = uintType });
     defer containerType.deinit();
 
     const VectorCompositeType = createVectorCompositeType(ContainerType, ZigType);
