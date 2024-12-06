@@ -58,13 +58,13 @@ test "ContainerType with 2 uints" {
 // TODO: ContainerType with ByteVectorType
 
 test "ContainerType with ListBasicType(uint64, 128) and uint64" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const UintType = createUintType(8);
     var uintType = try UintType.init();
     defer uintType.deinit();
 
     const ListBasicType = createListBasicType(UintType, u64);
-    var listBasicType = try ListBasicType.init(&allocator, &uintType, 128, 128);
+    var listBasicType = try ListBasicType.init(allocator, &uintType, 128, 128);
     defer listBasicType.deinit();
 
     const SszType = struct {

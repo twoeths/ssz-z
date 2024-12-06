@@ -17,7 +17,7 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
     const ArrayBasic = @import("./array_basic.zig").withElementTypes(ST, ZT);
 
     const VectorBasicType = struct {
-        allocator: *std.mem.Allocator,
+        allocator: std.mem.Allocator,
         element_type: *ST,
         length: usize,
         fixed_size: ?usize,
@@ -29,7 +29,7 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
         // this should always be a multiple of 64 bytes
         block_bytes: []u8,
 
-        pub fn init(allocator: *std.mem.Allocator, element_type: *ST, length: usize) !@This() {
+        pub fn init(allocator: std.mem.Allocator, element_type: *ST, length: usize) !@This() {
             const elem_byte_length = element_type.byte_length;
             const byte_len = elem_byte_length * length;
             const max_chunk_count: usize = (byte_len + 31 / 32);
@@ -135,7 +135,7 @@ test "deserializeFromBytes" {
     const UintType = @import("./uint.zig").createUintType(8);
     const VectorBasicType = createVectorBasicType(UintType, u64);
     var uintType = try UintType.init();
-    var vectorType = try VectorBasicType.init(&allocator, &uintType, 8);
+    var vectorType = try VectorBasicType.init(allocator, &uintType, 8);
     defer uintType.deinit();
     defer vectorType.deinit();
 
@@ -188,7 +188,7 @@ test "deserializeFromJson" {
     const UintType = @import("./uint.zig").createUintType(8);
     const VectorBasicType = createVectorBasicType(UintType, u64);
     var uintType = try UintType.init();
-    var vectorType = try VectorBasicType.init(&allocator, &uintType, 4);
+    var vectorType = try VectorBasicType.init(allocator, &uintType, 4);
     defer uintType.deinit();
     defer vectorType.deinit();
 

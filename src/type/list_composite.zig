@@ -284,7 +284,7 @@ test "ListCompositeType - element type is ListBasicType" {
 
     var uintType = try UintType.init();
     defer uintType.deinit();
-    var elementType = try SSZListBasicType.init(&allocator, &uintType, 2, 2);
+    var elementType = try SSZListBasicType.init(allocator, &uintType, 2, 2);
     defer elementType.deinit();
 
     var listType = try ListCompositeType.init(&allocator, &elementType, 2, 2);

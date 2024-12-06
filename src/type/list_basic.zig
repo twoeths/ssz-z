@@ -21,7 +21,7 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
     const ArrayBasic = @import("./array_basic.zig").withElementTypes(ST, ZT);
 
     const ListBasicType = struct {
-        allocator: *std.mem.Allocator,
+        allocator: std.mem.Allocator,
         element_type: *ST,
         limit: usize,
         fixed_size: ?usize,
@@ -35,14 +35,14 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
         mix_in_length_block_bytes: []u8,
 
         /// init_capacity is the initial capacity of elements, not bytes
-        pub fn init(allocator: *std.mem.Allocator, element_type: *ST, limit: usize, init_capacity: usize) !@This() {
+        pub fn init(allocator: std.mem.Allocator, element_type: *ST, limit: usize, init_capacity: usize) !@This() {
             const elem_byte_length = element_type.byte_length;
             const init_capacity_bytes = init_capacity * elem_byte_length;
             const max_chunk_count = (limit * elem_byte_length + 31) / 32;
             const chunk_depth = maxChunksToDepth(max_chunk_count);
             // Depth includes the extra level for the length node
             const depth = chunk_depth + 1;
-            return @This(){ .allocator = allocator, .element_type = element_type, .limit = limit, .fixed_size = null, .depth = depth, .chunk_depth = chunk_depth, .max_chunk_count = max_chunk_count, .min_size = 0, .max_size = limit * element_type.max_size, .block_bytes = try BlockBytes.initCapacity(allocator.*, init_capacity_bytes), .mix_in_length_block_bytes = try allocator.alloc(u8, 64) };
+            return @This(){ .allocator = allocator, .element_type = element_type, .limit = limit, .fixed_size = null, .depth = depth, .chunk_depth = chunk_depth, .max_chunk_count = max_chunk_count, .min_size = 0, .max_size = limit * element_type.max_size, .block_bytes = try BlockBytes.initCapacity(allocator, init_capacity_bytes), .mix_in_length_block_bytes = try allocator.alloc(u8, 64) };
         }
 
         pub fn deinit(self: @This()) void {
@@ -136,7 +136,7 @@ test "deserializeFromBytes" {
     const UintType = @import("./uint.zig").createUintType(8);
     const ListBasicType = createListBasicType(UintType, u64);
     var uintType = try UintType.init();
-    var listType = try ListBasicType.init(&allocator, &uintType, 128, 128);
+    var listType = try ListBasicType.init(allocator, &uintType, 128, 128);
     defer uintType.deinit();
     defer listType.deinit();
 
@@ -193,7 +193,7 @@ test "deserializeFromJson" {
     const UintType = @import("./uint.zig").createUintType(8);
     const ListBasicType = createListBasicType(UintType, u64);
     var uintType = try UintType.init();
-    var listType = try ListBasicType.init(&allocator, &uintType, 4, 2);
+    var listType = try ListBasicType.init(allocator, &uintType, 4, 2);
     defer uintType.deinit();
     defer listType.deinit();
 
