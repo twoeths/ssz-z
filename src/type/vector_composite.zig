@@ -22,7 +22,7 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
     const ArrayComposite = @import("./array_composite.zig").withElementTypes(ST, ZT);
 
     const VectorCompositeType = struct {
-        allocator: *std.mem.Allocator,
+        allocator: std.mem.Allocator,
         element_type: *ST,
         depth: usize,
         chunk_depth: usize,
@@ -34,7 +34,7 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
         // this should always be a multiple of 64 bytes
         block_bytes: []u8,
 
-        pub fn init(allocator: *std.mem.Allocator, element_type: *ST, length: usize) !@This() {
+        pub fn init(allocator: std.mem.Allocator, element_type: *ST, length: usize) !@This() {
             const max_chunk_count = length;
             const chunk_depth = maxChunksToDepth(max_chunk_count);
             const depth = chunk_depth;
@@ -135,13 +135,13 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
 }
 
 test "fromJson - VectorCompositeType of 4 roots" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const ByteVectorType = @import("./byte_vector_type.zig").ByteVectorType;
     var byteVectorType = try ByteVectorType.init(allocator, 32);
     defer byteVectorType.deinit();
 
     const VectorCompositeType = createVectorCompositeType(ByteVectorType, []u8);
-    var vectorCompositeType = try VectorCompositeType.init(&allocator, &byteVectorType, 4);
+    var vectorCompositeType = try VectorCompositeType.init(allocator, &byteVectorType, 4);
     defer vectorCompositeType.deinit();
     const json =
         \\[
@@ -169,7 +169,7 @@ test "fromJson - VectorCompositeType of 4 roots" {
 }
 
 test "fromJson - VectorCompositeType of 4 ContainerType({a: uint64Type, b: uint64Type})" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const UintType = @import("./uint.zig").createUintType(8);
     const uintType = try UintType.init();
     defer uintType.deinit();
@@ -188,7 +188,7 @@ test "fromJson - VectorCompositeType of 4 ContainerType({a: uint64Type, b: uint6
     defer containerType.deinit();
 
     const VectorCompositeType = createVectorCompositeType(ContainerType, ZigType);
-    var vectorCompositeType = try VectorCompositeType.init(&allocator, &containerType, 4);
+    var vectorCompositeType = try VectorCompositeType.init(allocator, &containerType, 4);
     defer vectorCompositeType.deinit();
     const json =
         \\[

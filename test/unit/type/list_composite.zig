@@ -30,7 +30,7 @@ test "ListCompositeType - element type ByteVectorType" {
     defer byte_vector_type.deinit();
 
     const ListCompositeType = createListCompositeType(ByteVectorType, []u8);
-    var list = try ListCompositeType.init(&allocator, &byte_vector_type, 128, 4);
+    var list = try ListCompositeType.init(allocator, &byte_vector_type, 128, 4);
     defer list.deinit();
 
     const TypeTest = @import("common.zig").typeTest(ListCompositeType, [][]u8);

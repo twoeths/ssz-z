@@ -21,7 +21,7 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
     const ArrayComposite = @import("./array_composite.zig").withElementTypes(ST, ZT);
 
     const ListCompositeType = struct {
-        allocator: *std.mem.Allocator,
+        allocator: std.mem.Allocator,
         element_type: *ST,
         limit: usize,
         fixed_size: ?usize,
@@ -35,7 +35,7 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
         mix_in_length_block_bytes: []u8,
 
         /// init_capacity is the initial capacity of elements, not bytes
-        pub fn init(allocator: *std.mem.Allocator, element_type: *ST, limit: usize, init_capacity: usize) !@This() {
+        pub fn init(allocator: std.mem.Allocator, element_type: *ST, limit: usize, init_capacity: usize) !@This() {
             const max_chunk_count = limit;
             const chunk_depth = maxChunksToDepth(max_chunk_count);
             const depth = chunk_depth + 1;
@@ -53,7 +53,7 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
                 .max_chunk_count = max_chunk_count,
                 .min_size = min_size,
                 .max_size = max_size,
-                .block_bytes = try BlockBytes.initCapacity(allocator.*, init_capacity_bytes),
+                .block_bytes = try BlockBytes.initCapacity(allocator, init_capacity_bytes),
                 .mix_in_length_block_bytes = try allocator.alloc(u8, 64),
             };
         }
@@ -114,7 +114,7 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
         }
 
         pub fn deserializeFromBytes(self: @This(), data: []const u8, out: []ZT) !void {
-            try ArrayComposite.deserializeFromBytes(self.allocator.*, self.element_type, data, out);
+            try ArrayComposite.deserializeFromBytes(self.allocator, self.element_type, data, out);
         }
 
         pub fn deserializeFromSlice(self: @This(), arena_allocator: Allocator, data: []const u8, _: ?[]ZT) ![]ZT {
@@ -152,7 +152,7 @@ test "ListCompositeType - element type ByteVectorType" {
     defer byteVectorType.deinit();
 
     const ListCompositeType = createListCompositeType(ByteVectorType, []u8);
-    var list = try ListCompositeType.init(&allocator, &byteVectorType, 128, 4);
+    var list = try ListCompositeType.init(allocator, &byteVectorType, 128, 4);
     defer list.deinit();
 
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -201,7 +201,7 @@ test "ListCompositeType - element type is ContainerType" {
     var elementType = try SSZContainerType.init(allocator, .{ .a = uintType, .b = uintType });
     defer elementType.deinit();
 
-    var listType = try ListCompositeType.init(&allocator, &elementType, 128, 64);
+    var listType = try ListCompositeType.init(allocator, &elementType, 128, 64);
     defer listType.deinit();
 
     const TestCase = struct {
@@ -287,7 +287,7 @@ test "ListCompositeType - element type is ListBasicType" {
     var elementType = try SSZListBasicType.init(allocator, &uintType, 2, 2);
     defer elementType.deinit();
 
-    var listType = try ListCompositeType.init(&allocator, &elementType, 2, 2);
+    var listType = try ListCompositeType.init(allocator, &elementType, 2, 2);
     defer listType.deinit();
 
     const TestCaseValue = []const u16;
