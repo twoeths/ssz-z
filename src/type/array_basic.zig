@@ -1,6 +1,10 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const Scanner = std.json.Scanner;
+const ArrayList = std.ArrayList;
+const Token = std.json.Token;
 const array = @import("./array.zig").withElementTypes;
+const JsonError = @import("./common.zig").JsonError;
 
 /// ST: ssz element type
 /// ZT: zig type
@@ -21,7 +25,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return byte_len;
         }
 
-        pub fn deserializeFromBytes(element_type: *ST, data: []const u8, out: []ZT) !void {
+        pub fn deserializeFromBytes(element_type: *ST, data: []const u8, out: []ZT) JsonError!void {
             const elem_byte_length = element_type.byte_length;
             if (data.len % elem_byte_length != 0) {
                 return error.InCorrectLen;
@@ -37,6 +41,9 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             }
         }
 
+        /// consumer need to free the memory
+        /// out parameter is unused because it's always allocated inside the function
+        /// TODO: consumer to validate the length, see deserializeFromJson
         pub fn deserializeFromSlice(arenaAllocator: Allocator, element_type: *ST, data: []const u8, _: ?[]ZT) ![]ZT {
             const elem_byte_length = element_type.byte_length;
             if (data.len % elem_byte_length != 0) {
@@ -46,12 +53,53 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             const elem_count = data.len / elem_byte_length;
             const result = try arenaAllocator.alloc(ZT, elem_count);
             for (result, 0..) |*elem, i| {
-                // TODO: how to avoid the copy?
+                // TODO: how to avoid the copy? or we can use ArrayList used in deserializeFromJson
                 // improve this when we have benchmark test
                 elem.* = (try element_type.deserializeFromSlice(arenaAllocator, data[i * elem_byte_length .. (i + 1) * elem_byte_length], null)).*;
             }
 
             return result;
+        }
+
+        pub fn fromJson(self: anytype, arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
+            return Array.fromJson(self, arena_allocator, json);
+        }
+
+        /// consumer need to free the memory
+        /// out parameter is unused because it's always allocated inside the function
+        pub fn deserializeFromJson(arena_allocator: Allocator, element_type: *ST, source: *Scanner, expected_len: ?usize, _: ?[]ZT) ![]ZT {
+            // validate start array token "["
+            const start_array_token = try source.next();
+            if (start_array_token != Token.array_begin) {
+                return error.InvalidJson;
+            }
+
+            // Typical array, handle same to std.json.static.zig
+            var arraylist = ArrayList(ZT).init(arena_allocator);
+            while (true) {
+                switch (try source.peekNextTokenType()) {
+                    .array_end => {
+                        _ = try source.next();
+                        break;
+                    },
+                    else => {},
+                }
+
+                try arraylist.ensureUnusedCapacity(1);
+                // TODO: we can also allocate ZT here, and pass its address to deserializeFromJson
+                const elem_ptr = try element_type.deserializeFromJson(arena_allocator, source, null);
+                arraylist.appendAssumeCapacity(elem_ptr.*);
+
+                if (expected_len != null and arraylist.items.len > expected_len.?) {
+                    return error.InCorrectLen;
+                }
+            }
+
+            if (expected_len != null and arraylist.items.len != expected_len.?) {
+                return error.InCorrectLen;
+            }
+
+            return arraylist.toOwnedSlice();
         }
 
         pub fn valueEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {

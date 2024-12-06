@@ -1,10 +1,13 @@
 const std = @import("std");
+const Token = std.json.Token;
+const Scanner = std.json.Scanner;
 const Allocator = std.mem.Allocator;
 const expect = std.testing.expect;
 const merkleize = @import("hash").merkleizeBlocksBytes;
 const HashFn = @import("hash").HashFn;
 const sha256Hash = @import("hash").sha256Hash;
 const toRootHex = @import("util").toRootHex;
+const JsonError = @import("./common.zig").JsonError;
 
 const BytesRange = struct {
     start: usize,
@@ -13,6 +16,7 @@ const BytesRange = struct {
 
 // create a ssz type from type of an ssz object
 // type of zig type will be used once and checked inside hashTreeRoot() function
+// TODO: define error types similar to JsonError for all apis
 pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn) type {
     const zig_fields_info = @typeInfo(ZT).Struct.fields;
     const max_chunk_count = zig_fields_info.len;
@@ -59,7 +63,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return @This(){
                 .allocator = allocator,
                 .ssz_fields = ssz_fields,
-                .blocks_bytes = try allocator.alloc(u8, 32 * blocks_bytes_len),
+                .blocks_bytes = try allocator.alloc(u8, blocks_bytes_len),
                 .min_size = min_size,
                 .max_size = max_size,
                 .fixed_size = fixed_size,
@@ -186,6 +190,59 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return out2;
         }
 
+        /// public function for consumers
+        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError!*ZT {
+            var source = Scanner.initCompleteInput(arena_allocator, json);
+            defer source.deinit();
+            const zt = try self.deserializeFromJson(arena_allocator, &source, null);
+            const end_document_token = try source.next();
+            switch (end_document_token) {
+                Token.end_of_document => {},
+                else => return error.InvalidJson,
+            }
+            return zt;
+        }
+
+        /// a recursive implementation for parent types or fromJson
+        pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, out: ?*ZT) JsonError!*ZT {
+            var out2 = if (out != null) out.? else try arena_allocator.create(ZT);
+
+            // validate begin token "{"
+            const begin_object_token = try source.next();
+            if (begin_object_token != Token.object_begin) {
+                return error.InvalidJson;
+            }
+
+            inline for (zig_fields_info) |field_info| {
+                const field_name = field_info.name;
+                const json_field_name = try source.next();
+                switch (json_field_name) {
+                    .string => |v| {
+                        // TODO: map case, make a separate function, create a separate type for mapping?
+                        if (!std.mem.eql(u8, v, field_name)) {
+                            return error.InvalidJson;
+                        }
+                    },
+                    else => return error.InvalidJson,
+                }
+
+                const ssz_type = &@field(self.ssz_fields, field_name);
+                if (@typeInfo(field_info.type) == .Pointer) {
+                    @field(out2, field_name) = try ssz_type.deserializeFromJson(arena_allocator, source, null);
+                } else {
+                    _ = try ssz_type.deserializeFromJson(arena_allocator, source, &@field(out2, field_name));
+                }
+            }
+
+            // validate end token "}"
+            const end_object_token = try source.next();
+            if (end_object_token != Token.object_end) {
+                return error.InvalidJson;
+            }
+
+            return out2;
+        }
+
         pub fn equals(self: @This(), a: *const ZT, b: *const ZT) bool {
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
@@ -284,6 +341,8 @@ test "basic ContainerType {x: uint, y:uint}" {
         .y = uintType,
     });
 
+    defer containerType.deinit();
+
     const obj = ZigType{ .x = 0xffffffffffffffff, .y = 0 };
     var root = [_]u8{0} ** 32;
     try containerType.hashTreeRoot(&obj, root[0..]);
@@ -310,7 +369,13 @@ test "basic ContainerType {x: uint, y:uint}" {
     try expect(obj3.x == obj.x);
     try expect(obj3.y == obj.y);
 
-    containerType.deinit();
+    // fromJson
+    const json = "{ \"x\": \"18446744073709551615\", \"y\": \"0\" }";
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const obj4 = try containerType.fromJson(arena.allocator(), json);
+    try expect(obj4.x == obj.x);
+    try expect(obj4.y == obj.y);
 }
 
 test "ContainerType with embedded struct" {
@@ -382,4 +447,15 @@ test "ContainerType with embedded struct" {
     try std.testing.expectEqualSlices(u8, root[0..], root3[0..]);
     obj3.a.x = 2024;
     try expect(obj.a.x != obj3.a.x);
+
+    // fromJson
+    const json = "{ \"a\": { \"x\": \"18446744073709551615\", \"y\": \"0\" }, \"b\": { \"x\": \"0\", \"y\": \"18446744073709551615\" } }";
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const obj4 = try containerType1.fromJson(arena.allocator(), json);
+    try expect(obj4.a.x == obj.a.x);
+    try expect(obj4.a.y == obj.a.y);
+    try expect(obj4.b.x == obj.b.x);
+    try expect(obj4.b.y == obj.b.y);
+    try expect(containerType1.equals(&obj, obj4));
 }

@@ -1,4 +1,6 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+const Scanner = std.json.Scanner;
 const maxChunksToDepth = @import("hash").maxChunksToDepth;
 const merkleize = @import("hash").merkleizeBlocksBytes;
 const sha256Hash = @import("hash").sha256Hash;
@@ -8,6 +10,7 @@ const initZeroHash = @import("hash").initZeroHash;
 const deinitZeroHash = @import("hash").deinitZeroHash;
 const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
+const JsonError = @import("./common.zig").JsonError;
 const native_endian = builtin.target.cpu.arch.endian();
 
 /// List: ordered variable-length homogeneous collection, limited to N values
@@ -114,6 +117,20 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
             try ArrayComposite.deserializeFromBytes(self.allocator.*, self.element_type, data, out);
         }
 
+        pub fn deserializeFromSlice(self: @This(), arena_allocator: Allocator, data: []const u8, _: ?[]ZT) ![]ZT {
+            return try ArrayComposite.deserializeFromSlice(arena_allocator, self.element_type, data, null);
+        }
+
+        /// public api
+        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
+            return ArrayComposite.fromJson(self, arena_allocator, json);
+        }
+
+        /// out parameter is not used because memory is always allocated inside the function
+        pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, _: ?[]ZT) JsonError![]ZT {
+            return try ArrayComposite.deserializeFromJson(arena_allocator, self.element_type, source, null, null);
+        }
+
         pub fn equals(self: @This(), a: []const ZT, b: []const ZT) bool {
             return ArrayComposite.valueEquals(self.element_type, a, b);
         }
@@ -126,10 +143,39 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
     return ListCompositeType;
 }
 
-// TODO
-// test "ListCompositeType - element type ByteVectorType" {
-//     const ByteVectorType = @import("./byte")
-// }
+test "ListCompositeType - element type ByteVectorType" {
+    var allocator = std.testing.allocator;
+    try initZeroHash(&allocator, 32);
+    defer deinitZeroHash();
+    const ByteVectorType = @import("./byte_vector_type.zig").ByteVectorType;
+    var byteVectorType = try ByteVectorType.init(&allocator, 32);
+    defer byteVectorType.deinit();
+
+    const ListCompositeType = createListCompositeType(ByteVectorType, []u8);
+    var list = try ListCompositeType.init(&allocator, &byteVectorType, 128, 4);
+    defer list.deinit();
+
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+
+    const json =
+        \\[
+        \\"0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        \\"0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        \\]
+    ;
+    const value = try list.fromJson(arena.allocator(), json);
+    // 0xdd = 221, 0xee = 238
+    try std.testing.expect(value.len == 2);
+    try std.testing.expectEqualSlices(u8, value[0], ([_]u8{221} ** 32)[0..]);
+    try std.testing.expectEqualSlices(u8, value[1], ([_]u8{238} ** 32)[0..]);
+
+    var root = [_]u8{0} ** 32;
+    try list.hashTreeRoot(value, root[0..]);
+
+    const rootHex = try toRootHex(root[0..]);
+    try std.testing.expectEqualSlices(u8, rootHex, "0x0cb947377e177f774719ead8d210af9c6461f41baf5b4082f86a3911454831b8");
+}
 
 test "ListCompositeType - element type is ContainerType" {
     var allocator = std.testing.allocator;
@@ -200,6 +246,27 @@ test "ListCompositeType - element type is ContainerType" {
         // equals
         try std.testing.expect(listType.equals(value[0..], cloned[0..]));
     }
+
+    // fromJson
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const json =
+        \\[
+        \\{"a": "0", "b": "0"},
+        \\{"a": "123456", "b": "654321"}
+        \\]
+    ;
+    const value = try listType.fromJson(arena.allocator(), json);
+    try std.testing.expectEqual(value.len, 2);
+    try std.testing.expectEqual(value[0].a, 0);
+    try std.testing.expectEqual(value[0].b, 0);
+    try std.testing.expectEqual(value[1].a, 123456);
+    try std.testing.expectEqual(value[1].b, 654321);
+
+    var root = [_]u8{0} ** 32;
+    try listType.hashTreeRoot(value, root[0..]);
+    const rootHex = try toRootHex(root[0..]);
+    try std.testing.expectEqualSlices(u8, rootHex, "0x8ff94c10d39ffa84aa937e2a077239c2742cb425a2a161744a3e9876eb3c7210");
 }
 
 test "ListCompositeType - element type is ListBasicType" {

@@ -1,8 +1,11 @@
 const std = @import("std");
+const Scanner = std.json.Scanner;
 const Allocator = std.mem.Allocator;
 const maxChunksToDepth = @import("hash").maxChunksToDepth;
 const merkleize = @import("hash").merkleizeBlocksBytes;
 const sha256Hash = @import("hash").sha256Hash;
+const fromHex = @import("util").fromHex;
+const FromHexError = @import("hash").FromHexError;
 
 pub const ByteVectorType = struct {
     allocator: *std.mem.Allocator,
@@ -16,8 +19,8 @@ pub const ByteVectorType = struct {
     block_bytes: []u8,
 
     pub fn init(allocator: *std.mem.Allocator, length_bytes: usize) !@This() {
-        const max_chunk_count: usize = (length_bytes + 31 / 32);
-        const chunk_depth = maxChunksToDepth(length_bytes);
+        const max_chunk_count: usize = (length_bytes + 31) / 32;
+        const chunk_depth = maxChunksToDepth(max_chunk_count);
         const depth = chunk_depth;
         const fixed_size = length_bytes;
         const min_size = fixed_size;
@@ -86,7 +89,7 @@ pub const ByteVectorType = struct {
 
     /// Same to deserializeFromBytes but this returns *T instead of out param
     /// Consumer need to free the memory
-    /// out parameter is unused, just to conform to the api
+    /// out parameter is unused because parent does not allocate, just to conform to the api
     pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, _: ?[]u8) ![]u8 {
         if (slice.len != self.fixed_size) {
             return error.InCorrectLen;
@@ -94,6 +97,30 @@ pub const ByteVectorType = struct {
 
         const result = try arenaAllocator.alloc(u8, self.fixed_size.?);
         @memcpy(result, slice);
+        return result;
+    }
+
+    /// fromJson
+    /// public function
+    pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) FromHexError![]u8 {
+        const result = try arena_allocator.alloc(u8, self.fixed_size.?);
+        try fromHex(json, result);
+        return result;
+    }
+
+    /// Implementation for parent
+    /// Consumer need to free the memory
+    /// out parameter is unused because parent does not allocate, just to conform to the api
+    pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, _: ?[]u8) ![]u8 {
+        const value = try source.next();
+        const result = try arena_allocator.alloc(u8, self.fixed_size.?);
+        try switch (value) {
+            .string => |v| {
+                try fromHex(v, result);
+            },
+            else => error.InvalidJson,
+        };
+
         return result;
     }
 
