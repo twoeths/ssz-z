@@ -2,12 +2,14 @@ const std = @import("std");
 const Token = std.json.Token;
 const Scanner = std.json.Scanner;
 const Allocator = std.mem.Allocator;
+const ArenaAllocator = std.heap.ArenaAllocator;
 const expect = std.testing.expect;
 const merkleize = @import("hash").merkleizeBlocksBytes;
 const HashFn = @import("hash").HashFn;
 const sha256Hash = @import("hash").sha256Hash;
 const toRootHex = @import("util").toRootHex;
 const JsonError = @import("./common.zig").JsonError;
+const Parsed = @import("./type.zig").Parsed;
 
 const BytesRange = struct {
     start: usize,
@@ -191,22 +193,28 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         }
 
         /// public function for consumers
-        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError!*ZT {
-            var source = Scanner.initCompleteInput(arena_allocator, json);
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!Parsed(ZT) {
+            const arena = try self.allocator.create(ArenaAllocator);
+            arena.* = ArenaAllocator.init(self.allocator);
+            const allocator = arena.allocator();
+            var source = Scanner.initCompleteInput(allocator, json);
             defer source.deinit();
-            const zt = try self.deserializeFromJson(arena_allocator, &source, null);
+            const zt = try self.deserializeFromJson(allocator, &source, null);
             const end_document_token = try source.next();
             switch (end_document_token) {
                 Token.end_of_document => {},
                 else => return error.InvalidJson,
             }
-            return zt;
+
+            return .{
+                .arena = arena,
+                .value = zt,
+            };
         }
 
         /// a recursive implementation for parent types or fromJson
         pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, out: ?*ZT) JsonError!*ZT {
             var out2 = if (out != null) out.? else try arena_allocator.create(ZT);
-
             // validate begin token "{"
             const begin_object_token = try source.next();
             if (begin_object_token != Token.object_begin) {
@@ -371,11 +379,10 @@ test "basic ContainerType {x: uint, y:uint}" {
 
     // fromJson
     const json = "{ \"x\": \"18446744073709551615\", \"y\": \"0\" }";
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-    const obj4 = try containerType.fromJson(arena.allocator(), json);
-    try expect(obj4.x == obj.x);
-    try expect(obj4.y == obj.y);
+    const parsed = try containerType.fromJson(json);
+    defer parsed.deinit();
+    try expect(parsed.value.x == obj.x);
+    try expect(parsed.value.y == obj.y);
 }
 
 test "ContainerType with embedded struct" {
@@ -450,12 +457,11 @@ test "ContainerType with embedded struct" {
 
     // fromJson
     const json = "{ \"a\": { \"x\": \"18446744073709551615\", \"y\": \"0\" }, \"b\": { \"x\": \"0\", \"y\": \"18446744073709551615\" } }";
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-    const obj4 = try containerType1.fromJson(arena.allocator(), json);
-    try expect(obj4.a.x == obj.a.x);
-    try expect(obj4.a.y == obj.a.y);
-    try expect(obj4.b.x == obj.b.x);
-    try expect(obj4.b.y == obj.b.y);
-    try expect(containerType1.equals(&obj, obj4));
+    const parsed = try containerType1.fromJson(json);
+    defer parsed.deinit();
+    try expect(parsed.value.a.x == obj.a.x);
+    try expect(parsed.value.a.y == obj.a.y);
+    try expect(parsed.value.b.x == obj.b.x);
+    try expect(parsed.value.b.y == obj.b.y);
+    try expect(containerType1.equals(&obj, parsed.value));
 }
