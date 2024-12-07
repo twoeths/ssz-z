@@ -114,6 +114,10 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
         }
 
         /// public api
+        pub fn fromSsz(self: @This(), ssz: []const u8) !Parsed([]ZT) {
+            return ArrayComposite.fromSsz(self, ssz);
+        }
+
         pub fn fromJson(self: @This(), json: []const u8) JsonError!Parsed([]ZT) {
             return ArrayComposite.fromJson(self, json);
         }

@@ -97,16 +97,20 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
             try ArrayBasic.deserializeFromBytes(self.element_type, data, out);
         }
 
+        /// public api
+        pub fn fromSsz(self: @This(), ssz: []const u8) !Parsed([]ZT) {
+            return ArrayBasic.fromSsz(self, ssz);
+        }
+
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!Parsed([]ZT) {
+            return ArrayBasic.fromJson(self, json);
+        }
+
         /// Same to deserializeFromBytes but this returns *T instead of out param
         /// Consumer need to free the memory
         /// out parameter is unused, just to conform to the api
         pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, out: ?[]ZT) ![]ZT {
             return try ArrayBasic.deserializeFromSlice(arenaAllocator, self.element_type, slice, out);
-        }
-
-        /// public api
-        pub fn fromJson(self: @This(), json: []const u8) JsonError!Parsed([]ZT) {
-            return ArrayBasic.fromJson(self, json);
         }
 
         /// Implementation for parent

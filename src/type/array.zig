@@ -8,6 +8,22 @@ const Parsed = @import("./type.zig").Parsed;
 /// ZT: zig type
 pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
     const Array = struct {
+        pub fn fromSsz(self: anytype, ssz: []const u8) !Parsed([]ZT) {
+            const arena = try self.allocator.create(ArenaAllocator);
+            arena.* = ArenaAllocator.init(self.allocator);
+            const allocator = arena.allocator();
+
+            // must destroy before deinit()
+            errdefer self.allocator.destroy(arena);
+            errdefer arena.deinit();
+
+            const value = try self.deserializeFromSlice(allocator, ssz, null);
+            return .{
+                .arena = arena,
+                .value = value,
+            };
+        }
+
         pub fn fromJson(self: anytype, json: []const u8) JsonError!Parsed([]ZT) {
             const arena = try self.allocator.create(ArenaAllocator);
             arena.* = ArenaAllocator.init(self.allocator);

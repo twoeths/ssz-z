@@ -118,6 +118,10 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return result;
         }
 
+        pub fn fromSsz(self: anytype, data: []const u8) !Parsed([]ZT) {
+            return Array.fromSsz(self, data);
+        }
+
         pub fn fromJson(self: anytype, json: []const u8) JsonError!Parsed([]ZT) {
             return Array.fromJson(self, json);
         }

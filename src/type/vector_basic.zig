@@ -102,8 +102,12 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
             return try ArrayBasic.deserializeFromSlice(arenaAllocator, self.element_type, slice, out);
         }
 
-        /// fromJson
         /// public api
+        pub fn fromSsz(self: @This(), ssz: []const u8) !Parsed([]ZT) {
+            return ArrayBasic.fromSsz(self, ssz);
+        }
+
+        /// fromJson
         pub fn fromJson(self: @This(), json: []const u8) JsonError!Parsed([]ZT) {
             return ArrayBasic.fromJson(self, json);
         }
