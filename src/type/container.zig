@@ -167,29 +167,22 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             }
         }
 
-        /// for embedded struct, it's allocated by the parent struct
-        /// for pointer or slice, it's allocated on its own
-        pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, out: ?*ZT) !*ZT {
-            var out2 = if (out != null) out.? else try arenaAllocator.create(ZT);
+        /// public function for consumers
+        /// TODO: straight forward error type
+        pub fn fromSsz(self: @This(), ssz: []const u8) !Parsed(ZT) {
+            const arena = try self.allocator.create(ArenaAllocator);
+            arena.* = ArenaAllocator.init(self.allocator);
+            const allocator = arena.allocator();
 
-            // TODO: validate data length
-            // max_chunk_count is known at compile time so we can allocate on stack
-            var field_ranges = [_]BytesRange{.{ .start = 0, .end = 0 }} ** max_chunk_count;
-            try self.getFieldRanges(slice, field_ranges[0..]);
-            inline for (zig_fields_info, 0..) |field_info, i| {
-                const field_name = field_info.name;
-                const ssz_type = &@field(self.ssz_fields, field_name);
-                const field_range = field_ranges[i];
-                const field_data = slice[field_range.start..field_range.end];
+            // must destroy before deinit()
+            errdefer self.allocator.destroy(arena);
+            errdefer arena.deinit();
 
-                if (@typeInfo(field_info.type) == .Pointer) {
-                    @field(out2, field_name) = try ssz_type.deserializeFromSlice(arenaAllocator, field_data, null);
-                } else {
-                    _ = try ssz_type.deserializeFromSlice(arenaAllocator, field_data, &@field(out2, field_name));
-                }
-            }
-
-            return out2;
+            const value = try self.deserializeFromSlice(allocator, ssz, null);
+            return .{
+                .arena = arena,
+                .value = value,
+            };
         }
 
         /// public function for consumers
@@ -215,6 +208,31 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 .arena = arena,
                 .value = zt,
             };
+        }
+
+        /// for embedded struct, it's allocated by the parent struct
+        /// for pointer or slice, it's allocated on its own
+        pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, out: ?*ZT) !*ZT {
+            var out2 = if (out != null) out.? else try arenaAllocator.create(ZT);
+
+            // TODO: validate data length
+            // max_chunk_count is known at compile time so we can allocate on stack
+            var field_ranges = [_]BytesRange{.{ .start = 0, .end = 0 }} ** max_chunk_count;
+            try self.getFieldRanges(slice, field_ranges[0..]);
+            inline for (zig_fields_info, 0..) |field_info, i| {
+                const field_name = field_info.name;
+                const ssz_type = &@field(self.ssz_fields, field_name);
+                const field_range = field_ranges[i];
+                const field_data = slice[field_range.start..field_range.end];
+
+                if (@typeInfo(field_info.type) == .Pointer) {
+                    @field(out2, field_name) = try ssz_type.deserializeFromSlice(arenaAllocator, field_data, null);
+                } else {
+                    _ = try ssz_type.deserializeFromSlice(arenaAllocator, field_data, &@field(out2, field_name));
+                }
+            }
+
+            return out2;
         }
 
         /// a recursive implementation for parent types or fromJson

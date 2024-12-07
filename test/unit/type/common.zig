@@ -29,9 +29,12 @@ pub fn typeTest(comptime ST: type, comptime ZT: type) type {
             try fromHex(tc.serializedHex, serialized);
 
             // deserialize
-            var arena = std.heap.ArenaAllocator.init(allocator);
-            defer arena.deinit();
-            const value = try t.deserializeFromSlice(arena.allocator(), serialized, null);
+            // var arena = std.heap.ArenaAllocator.init(allocator);
+            // defer arena.deinit();
+            // const value = try t.deserializeFromSlice(arena.allocator(), serialized, null);
+            const ssz_result = try t.fromSsz(serialized);
+            defer ssz_result.deinit();
+            const value = ssz_result.value;
 
             // fromJson
             const parsed = try t.fromJson(tc.json);
