@@ -6,6 +6,7 @@ const array = @import("./array.zig").withElementTypes;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 const JsonError = @import("./common.zig").JsonError;
+const Parsed = @import("./type.zig").Parsed;
 
 /// ST: ssz element type
 /// ZT: zig type
@@ -117,8 +118,8 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return result;
         }
 
-        pub fn fromJson(self: anytype, arena_allocator: std.mem.Allocator, json: []const u8) JsonError![]ZT {
-            return Array.fromJson(self, arena_allocator, json);
+        pub fn fromJson(self: anytype, json: []const u8) JsonError!Parsed([]ZT) {
+            return Array.fromJson(self, json);
         }
 
         /// same to deserializeFromSlice but this comes from a json string

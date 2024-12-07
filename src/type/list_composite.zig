@@ -12,6 +12,7 @@ const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
 const JsonError = @import("./common.zig").JsonError;
 const native_endian = builtin.target.cpu.arch.endian();
+const Parsed = @import("./type.zig").Parsed;
 
 /// List: ordered variable-length homogeneous collection, limited to N values
 /// ST: ssz element type
@@ -122,8 +123,8 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
         }
 
         /// public api
-        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
-            return ArrayComposite.fromJson(self, arena_allocator, json);
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!Parsed([]ZT) {
+            return ArrayComposite.fromJson(self, json);
         }
 
         /// out parameter is not used because memory is always allocated inside the function
@@ -164,7 +165,9 @@ test "ListCompositeType - element type ByteVectorType" {
         \\"0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
         \\]
     ;
-    const value = try list.fromJson(arena.allocator(), json);
+    const result = try list.fromJson(json);
+    defer result.deinit();
+    const value = result.value;
     // 0xdd = 221, 0xee = 238
     try std.testing.expect(value.len == 2);
     try std.testing.expectEqualSlices(u8, value[0], ([_]u8{221} ** 32)[0..]);
@@ -248,15 +251,15 @@ test "ListCompositeType - element type is ContainerType" {
     }
 
     // fromJson
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
     const json =
         \\[
         \\{"a": "0", "b": "0"},
         \\{"a": "123456", "b": "654321"}
         \\]
     ;
-    const value = try listType.fromJson(arena.allocator(), json);
+    const result = try listType.fromJson(json);
+    defer result.deinit();
+    const value = result.value;
     try std.testing.expectEqual(value.len, 2);
     try std.testing.expectEqual(value[0].a, 0);
     try std.testing.expectEqual(value[0].b, 0);

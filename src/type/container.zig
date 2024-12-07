@@ -197,6 +197,11 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             const arena = try self.allocator.create(ArenaAllocator);
             arena.* = ArenaAllocator.init(self.allocator);
             const allocator = arena.allocator();
+
+            // must destroy before deinit()
+            errdefer self.allocator.destroy(arena);
+            errdefer arena.deinit();
+
             var source = Scanner.initCompleteInput(allocator, json);
             defer source.deinit();
             const zt = try self.deserializeFromJson(allocator, &source, null);

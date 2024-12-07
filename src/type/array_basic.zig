@@ -5,6 +5,7 @@ const ArrayList = std.ArrayList;
 const Token = std.json.Token;
 const array = @import("./array.zig").withElementTypes;
 const JsonError = @import("./common.zig").JsonError;
+const Parsed = @import("./type.zig").Parsed;
 
 /// ST: ssz element type
 /// ZT: zig type
@@ -61,8 +62,8 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return result;
         }
 
-        pub fn fromJson(self: anytype, arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
-            return Array.fromJson(self, arena_allocator, json);
+        pub fn fromJson(self: anytype, json: []const u8) JsonError!Parsed([]ZT) {
+            return Array.fromJson(self, json);
         }
 
         /// consumer need to free the memory

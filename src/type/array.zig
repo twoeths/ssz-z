@@ -1,21 +1,34 @@
 const std = @import("std");
+const ArenaAllocator = std.heap.ArenaAllocator;
 const Scanner = std.json.Scanner;
 const JsonError = @import("./common.zig").JsonError;
+const Parsed = @import("./type.zig").Parsed;
 
 /// ST: ssz element type
 /// ZT: zig type
 pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
     const Array = struct {
-        pub fn fromJson(self: anytype, arena_allocator: std.mem.Allocator, json: []const u8) JsonError![]ZT {
-            var source = Scanner.initCompleteInput(arena_allocator, json);
+        pub fn fromJson(self: anytype, json: []const u8) JsonError!Parsed([]ZT) {
+            const arena = try self.allocator.create(ArenaAllocator);
+            arena.* = ArenaAllocator.init(self.allocator);
+            const allocator = arena.allocator();
+
+            // must destroy before deinit()
+            errdefer self.allocator.destroy(arena);
+            errdefer arena.deinit();
+
+            var source = Scanner.initCompleteInput(allocator, json);
             defer source.deinit();
-            const result = try self.deserializeFromJson(arena_allocator, &source, null);
+            const result = try self.deserializeFromJson(allocator, &source, null);
             const end_document_token = try source.next();
             switch (end_document_token) {
                 .end_of_document => {},
                 else => return error.InvalidJson,
             }
-            return result;
+            return .{
+                .arena = arena,
+                .value = result,
+            };
         }
 
         pub fn valueEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {

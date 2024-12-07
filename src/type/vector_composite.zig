@@ -12,6 +12,7 @@ const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 const JsonError = @import("./common.zig").JsonError;
+const Parsed = @import("./type.zig").Parsed;
 
 /// Vector: Ordered fixed-length homogeneous collection, with N values
 ///
@@ -113,8 +114,8 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
         }
 
         /// public api
-        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
-            return ArrayComposite.fromJson(self, arena_allocator, json);
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!Parsed([]ZT) {
+            return ArrayComposite.fromJson(self, json);
         }
 
         /// out parameter is not used because memory is always allocated inside the function
@@ -152,9 +153,9 @@ test "fromJson - VectorCompositeType of 4 roots" {
         \\]
     ;
 
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-    const value = try vectorCompositeType.fromJson(arena.allocator(), json);
+    const json_result = try vectorCompositeType.fromJson(json);
+    defer json_result.deinit();
+    const value = json_result.value;
     // 0xbb = 187, 0xcc = 204, 0xdd = 221, 0xee = 238
     try std.testing.expect(value.len == 4);
     try std.testing.expectEqualSlices(u8, value[0], ([_]u8{187} ** 32)[0..]);
@@ -199,9 +200,9 @@ test "fromJson - VectorCompositeType of 4 ContainerType({a: uint64Type, b: uint6
         \\]
     ;
 
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-    const value = try vectorCompositeType.fromJson(arena.allocator(), json);
+    const json_result = try vectorCompositeType.fromJson(json);
+    defer json_result.deinit();
+    const value = json_result.value;
     try std.testing.expect(value.len == 4);
     try std.testing.expectEqual(0, value[0].a);
     try std.testing.expectEqual(0, value[0].b);

@@ -12,6 +12,7 @@ const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 const JsonError = @import("./common.zig").JsonError;
+const Parsed = @import("./type.zig").Parsed;
 
 /// List: ordered variable-length homogeneous collection, limited to N values
 /// ST: ssz element type
@@ -104,8 +105,8 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
         }
 
         /// public api
-        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
-            return ArrayBasic.fromJson(self, arena_allocator, json);
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!Parsed([]ZT) {
+            return ArrayBasic.fromJson(self, json);
         }
 
         /// Implementation for parent
@@ -200,17 +201,16 @@ test "deserializeFromJson" {
     const json = "[\"100000\", \"200000\", \"300000\", \"400000\"]";
     const expected = ([_]u64{ 100000, 200000, 300000, 400000 })[0..];
 
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-
-    const result = try listType.fromJson(arena.allocator(), json);
-    try std.testing.expectEqual(result.len, expected.len);
-    for (result, expected) |a, b| {
+    const result = try listType.fromJson(json);
+    defer result.deinit();
+    try std.testing.expectEqual(result.value.len, expected.len);
+    for (result.value, expected) |a, b| {
         try std.testing.expectEqual(a, b);
     }
 
     // missing "]" at the end
-    if (listType.fromJson(arena.allocator(), "[\"100000\", \"200000\", \"300000\"")) |_| {
+    const malformed_json_result = listType.fromJson("[\"100000\", \"200000\", \"300000\"");
+    if (malformed_json_result) |_| {
         unreachable;
     } else |err| switch (err) {
         error.UnexpectedEndOfInput => {},

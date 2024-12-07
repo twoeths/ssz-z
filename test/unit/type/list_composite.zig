@@ -25,7 +25,7 @@ test "ListCompositeType - element type ByteVectorType" {
         // , .rootHex = "0x0cb947377e177f774719ead8d210af9c6461f41baf5b4082f86a3911454831b8" },
     };
 
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     var byte_vector_type = try ByteVectorType.init(allocator, 32);
     defer byte_vector_type.deinit();
 
