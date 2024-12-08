@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const Scanner = std.json.Scanner;
 const Token = std.json.Token;
 const ArrayList = std.ArrayList;
@@ -6,11 +7,13 @@ const array = @import("./array.zig").withElementTypes;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 const JsonError = @import("./common.zig").JsonError;
+const Parsed = @import("./type.zig").Parsed;
 
 /// ST: ssz element type
 /// ZT: zig type
 pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
     const Array = array(ST, ZT);
+    const ParsedResult = Parsed([]ZT);
 
     const ArrayComposite = struct {
         pub fn minSize(element_type: *ST, min_count: usize) usize {
@@ -117,8 +120,16 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return result;
         }
 
-        pub fn fromJson(self: anytype, arena_allocator: std.mem.Allocator, json: []const u8) JsonError![]ZT {
-            return Array.fromJson(self, arena_allocator, json);
+        pub fn fromSsz(self: anytype, data: []const u8) !ParsedResult {
+            return Array.fromSsz(self, data);
+        }
+
+        pub fn fromJson(self: anytype, json: []const u8) JsonError!ParsedResult {
+            return Array.fromJson(self, json);
+        }
+
+        pub fn clone(self: anytype, value: []const ZT) !ParsedResult {
+            return Array.clone(self, value);
         }
 
         /// same to deserializeFromSlice but this comes from a json string
@@ -168,8 +179,8 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return Array.valueEquals(element_type, a, b);
         }
 
-        pub fn valueClone(element_type: *ST, value: []const ZT, out: []ZT) !void {
-            return Array.valueClone(element_type, value, out);
+        pub fn valueClone(element_type: *ST, arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+            return Array.valueClone(element_type, arena_allocator, value, out);
         }
 
         // consumer should free the returned array

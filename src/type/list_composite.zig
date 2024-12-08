@@ -12,6 +12,7 @@ const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
 const JsonError = @import("./common.zig").JsonError;
 const native_endian = builtin.target.cpu.arch.endian();
+const Parsed = @import("./type.zig").Parsed;
 
 /// List: ordered variable-length homogeneous collection, limited to N values
 /// ST: ssz element type
@@ -19,9 +20,10 @@ const native_endian = builtin.target.cpu.arch.endian();
 pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
     const BlockBytes = ArrayList(u8);
     const ArrayComposite = @import("./array_composite.zig").withElementTypes(ST, ZT);
+    const ParsedResult = Parsed([]ZT);
 
     const ListCompositeType = struct {
-        allocator: *std.mem.Allocator,
+        allocator: std.mem.Allocator,
         element_type: *ST,
         limit: usize,
         fixed_size: ?usize,
@@ -35,7 +37,7 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
         mix_in_length_block_bytes: []u8,
 
         /// init_capacity is the initial capacity of elements, not bytes
-        pub fn init(allocator: *std.mem.Allocator, element_type: *ST, limit: usize, init_capacity: usize) !@This() {
+        pub fn init(allocator: std.mem.Allocator, element_type: *ST, limit: usize, init_capacity: usize) !@This() {
             const max_chunk_count = limit;
             const chunk_depth = maxChunksToDepth(max_chunk_count);
             const depth = chunk_depth + 1;
@@ -53,7 +55,7 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
                 .max_chunk_count = max_chunk_count,
                 .min_size = min_size,
                 .max_size = max_size,
-                .block_bytes = try BlockBytes.initCapacity(allocator.*, init_capacity_bytes),
+                .block_bytes = try BlockBytes.initCapacity(allocator, init_capacity_bytes),
                 .mix_in_length_block_bytes = try allocator.alloc(u8, 64),
             };
         }
@@ -114,7 +116,7 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
         }
 
         pub fn deserializeFromBytes(self: @This(), data: []const u8, out: []ZT) !void {
-            try ArrayComposite.deserializeFromBytes(self.allocator.*, self.element_type, data, out);
+            try ArrayComposite.deserializeFromBytes(self.allocator, self.element_type, data, out);
         }
 
         pub fn deserializeFromSlice(self: @This(), arena_allocator: Allocator, data: []const u8, _: ?[]ZT) ![]ZT {
@@ -122,8 +124,16 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
         }
 
         /// public api
-        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
-            return ArrayComposite.fromJson(self, arena_allocator, json);
+        pub fn fromSsz(self: @This(), ssz: []const u8) !ParsedResult {
+            return ArrayComposite.fromSsz(self, ssz);
+        }
+
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+            return ArrayComposite.fromJson(self, json);
+        }
+
+        pub fn clone(self: @This(), value: []const ZT) !ParsedResult {
+            return ArrayComposite.clone(self, value);
         }
 
         /// out parameter is not used because memory is always allocated inside the function
@@ -135,8 +145,8 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
             return ArrayComposite.valueEquals(self.element_type, a, b);
         }
 
-        pub fn clone(self: @This(), value: []const ZT, out: []ZT) !void {
-            try ArrayComposite.valueClone(self.element_type, value, out);
+        pub fn doClone(self: @This(), arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+            return try ArrayComposite.valueClone(self.element_type, arena_allocator, value, out);
         }
     };
 
@@ -148,11 +158,11 @@ test "ListCompositeType - element type ByteVectorType" {
     try initZeroHash(&allocator, 32);
     defer deinitZeroHash();
     const ByteVectorType = @import("./byte_vector_type.zig").ByteVectorType;
-    var byteVectorType = try ByteVectorType.init(&allocator, 32);
+    var byteVectorType = try ByteVectorType.init(allocator, 32);
     defer byteVectorType.deinit();
 
     const ListCompositeType = createListCompositeType(ByteVectorType, []u8);
-    var list = try ListCompositeType.init(&allocator, &byteVectorType, 128, 4);
+    var list = try ListCompositeType.init(allocator, &byteVectorType, 128, 4);
     defer list.deinit();
 
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -164,7 +174,9 @@ test "ListCompositeType - element type ByteVectorType" {
         \\"0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
         \\]
     ;
-    const value = try list.fromJson(arena.allocator(), json);
+    const result = try list.fromJson(json);
+    defer result.deinit();
+    const value = result.value;
     // 0xdd = 221, 0xee = 238
     try std.testing.expect(value.len == 2);
     try std.testing.expectEqualSlices(u8, value[0], ([_]u8{221} ** 32)[0..]);
@@ -198,10 +210,10 @@ test "ListCompositeType - element type is ContainerType" {
 
     const uintType = try UintType.init();
     defer uintType.deinit();
-    var elementType = try SSZContainerType.init(&allocator, .{ .a = uintType, .b = uintType });
+    var elementType = try SSZContainerType.init(allocator, .{ .a = uintType, .b = uintType });
     defer elementType.deinit();
 
-    var listType = try ListCompositeType.init(&allocator, &elementType, 128, 64);
+    var listType = try ListCompositeType.init(allocator, &elementType, 128, 64);
     defer listType.deinit();
 
     const TestCase = struct {
@@ -237,8 +249,9 @@ test "ListCompositeType - element type is ContainerType" {
         try std.testing.expectEqualSlices(u8, tc.root, rootHex);
 
         // clone
-        const cloned = valueMax[tc.value.len..(tc.value.len * 2)];
-        try listType.clone(value, cloned);
+        const cloned_result = try listType.clone(value);
+        defer cloned_result.deinit();
+        const cloned = cloned_result.value;
         var root2 = [_]u8{0} ** 32;
         try listType.hashTreeRoot(cloned[0..], root2[0..]);
         try std.testing.expectEqualSlices(u8, root2[0..], root[0..]);
@@ -248,15 +261,15 @@ test "ListCompositeType - element type is ContainerType" {
     }
 
     // fromJson
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
     const json =
         \\[
         \\{"a": "0", "b": "0"},
         \\{"a": "123456", "b": "654321"}
         \\]
     ;
-    const value = try listType.fromJson(arena.allocator(), json);
+    const result = try listType.fromJson(json);
+    defer result.deinit();
+    const value = result.value;
     try std.testing.expectEqual(value.len, 2);
     try std.testing.expectEqual(value[0].a, 0);
     try std.testing.expectEqual(value[0].b, 0);
@@ -284,10 +297,10 @@ test "ListCompositeType - element type is ListBasicType" {
 
     var uintType = try UintType.init();
     defer uintType.deinit();
-    var elementType = try SSZListBasicType.init(&allocator, &uintType, 2, 2);
+    var elementType = try SSZListBasicType.init(allocator, &uintType, 2, 2);
     defer elementType.deinit();
 
-    var listType = try ListCompositeType.init(&allocator, &elementType, 2, 2);
+    var listType = try ListCompositeType.init(allocator, &elementType, 2, 2);
     defer listType.deinit();
 
     const TestCaseValue = []const u16;
@@ -347,17 +360,9 @@ test "ListCompositeType - element type is ListBasicType" {
         try std.testing.expectEqualSlices(u8, tc.root, rootHex);
 
         // clone
-        // deserializeFromBytes requries consumers to know the size in advance
-        var buffer2 = try allocator.alloc(u16, totalBytes);
-        defer allocator.free(buffer2);
-        var value2 = try allocator.alloc([]u16, tc.value.len);
-        defer allocator.free(value2);
-        var buffer_offset2: usize = 0;
-        for (tc.value, 0..) |*v, i| {
-            value2[i] = buffer2[buffer_offset2 .. buffer_offset2 + v.len];
-            buffer_offset2 = buffer_offset2 + v.len;
-        }
-        try listType.clone(value, value2);
+        const cloned_result = try listType.clone(value);
+        defer cloned_result.deinit();
+        const value2 = cloned_result.value;
         var root2 = [_]u8{0} ** 32;
         try listType.hashTreeRoot(value2[0..], root2[0..]);
         try std.testing.expectEqualSlices(u8, root2[0..], root[0..]);

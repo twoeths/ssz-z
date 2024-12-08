@@ -12,6 +12,7 @@ const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 const JsonError = @import("./common.zig").JsonError;
+const Parsed = @import("./type.zig").Parsed;
 
 /// Vector: Ordered fixed-length homogeneous collection, with N values
 ///
@@ -20,9 +21,10 @@ const JsonError = @import("./common.zig").JsonError;
 /// - Composite types are always returned as views
 pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
     const ArrayComposite = @import("./array_composite.zig").withElementTypes(ST, ZT);
+    const ParsedResult = Parsed([]ZT);
 
     const VectorCompositeType = struct {
-        allocator: *std.mem.Allocator,
+        allocator: std.mem.Allocator,
         element_type: *ST,
         depth: usize,
         chunk_depth: usize,
@@ -34,7 +36,7 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
         // this should always be a multiple of 64 bytes
         block_bytes: []u8,
 
-        pub fn init(allocator: *std.mem.Allocator, element_type: *ST, length: usize) !@This() {
+        pub fn init(allocator: std.mem.Allocator, element_type: *ST, length: usize) !@This() {
             const max_chunk_count = length;
             const chunk_depth = maxChunksToDepth(max_chunk_count);
             const depth = chunk_depth;
@@ -113,8 +115,16 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
         }
 
         /// public api
-        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
-            return ArrayComposite.fromJson(self, arena_allocator, json);
+        pub fn fromSsz(self: @This(), ssz: []const u8) !ParsedResult {
+            return ArrayComposite.fromSsz(self, ssz);
+        }
+
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+            return ArrayComposite.fromJson(self, json);
+        }
+
+        pub fn clone(self: @This(), value: []const ZT) !ParsedResult {
+            return ArrayComposite.clone(self, value);
         }
 
         /// out parameter is not used because memory is always allocated inside the function
@@ -126,8 +136,8 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
             return ArrayComposite.valueEquals(self.element_type, a, b);
         }
 
-        pub fn clone(self: @This(), value: []const ZT, out: []ZT) !void {
-            try ArrayComposite.valueClone(self.element_type, value, out);
+        pub fn doClone(self: @This(), arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+            return try ArrayComposite.valueClone(self.element_type, arena_allocator, value, out);
         }
     };
 
@@ -135,13 +145,13 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
 }
 
 test "fromJson - VectorCompositeType of 4 roots" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const ByteVectorType = @import("./byte_vector_type.zig").ByteVectorType;
-    var byteVectorType = try ByteVectorType.init(&allocator, 32);
+    var byteVectorType = try ByteVectorType.init(allocator, 32);
     defer byteVectorType.deinit();
 
     const VectorCompositeType = createVectorCompositeType(ByteVectorType, []u8);
-    var vectorCompositeType = try VectorCompositeType.init(&allocator, &byteVectorType, 4);
+    var vectorCompositeType = try VectorCompositeType.init(allocator, &byteVectorType, 4);
     defer vectorCompositeType.deinit();
     const json =
         \\[
@@ -152,9 +162,9 @@ test "fromJson - VectorCompositeType of 4 roots" {
         \\]
     ;
 
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-    const value = try vectorCompositeType.fromJson(arena.allocator(), json);
+    const json_result = try vectorCompositeType.fromJson(json);
+    defer json_result.deinit();
+    const value = json_result.value;
     // 0xbb = 187, 0xcc = 204, 0xdd = 221, 0xee = 238
     try std.testing.expect(value.len == 4);
     try std.testing.expectEqualSlices(u8, value[0], ([_]u8{187} ** 32)[0..]);
@@ -169,7 +179,7 @@ test "fromJson - VectorCompositeType of 4 roots" {
 }
 
 test "fromJson - VectorCompositeType of 4 ContainerType({a: uint64Type, b: uint64Type})" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const UintType = @import("./uint.zig").createUintType(8);
     const uintType = try UintType.init();
     defer uintType.deinit();
@@ -184,11 +194,11 @@ test "fromJson - VectorCompositeType of 4 ContainerType({a: uint64Type, b: uint6
     };
 
     const ContainerType = @import("./container.zig").createContainerType(SszType, ZigType, sha256Hash);
-    var containerType = try ContainerType.init(&allocator, SszType{ .a = uintType, .b = uintType });
+    var containerType = try ContainerType.init(allocator, SszType{ .a = uintType, .b = uintType });
     defer containerType.deinit();
 
     const VectorCompositeType = createVectorCompositeType(ContainerType, ZigType);
-    var vectorCompositeType = try VectorCompositeType.init(&allocator, &containerType, 4);
+    var vectorCompositeType = try VectorCompositeType.init(allocator, &containerType, 4);
     defer vectorCompositeType.deinit();
     const json =
         \\[
@@ -199,9 +209,9 @@ test "fromJson - VectorCompositeType of 4 ContainerType({a: uint64Type, b: uint6
         \\]
     ;
 
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-    const value = try vectorCompositeType.fromJson(arena.allocator(), json);
+    const json_result = try vectorCompositeType.fromJson(json);
+    defer json_result.deinit();
+    const value = json_result.value;
     try std.testing.expect(value.len == 4);
     try std.testing.expectEqual(0, value[0].a);
     try std.testing.expectEqual(0, value[0].b);

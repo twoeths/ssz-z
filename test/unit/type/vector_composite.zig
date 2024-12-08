@@ -19,16 +19,16 @@ test "VectorCompositeType of Root" {
         },
     };
 
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const ByteVectorType = @import("ssz").ByteVectorType;
-    var byte_vector_type = try ByteVectorType.init(&allocator, 32);
+    var byte_vector_type = try ByteVectorType.init(allocator, 32);
     defer byte_vector_type.deinit();
 
     const VectorCompositeType = createVectorCompositeType(ByteVectorType, []u8);
-    var vector_composite_type = try VectorCompositeType.init(&allocator, &byte_vector_type, 4);
+    var vector_composite_type = try VectorCompositeType.init(allocator, &byte_vector_type, 4);
     defer vector_composite_type.deinit();
 
-    const TypeTest = @import("common.zig").typeTest(VectorCompositeType, [][]u8);
+    const TypeTest = @import("common.zig").typeTest(VectorCompositeType);
 
     for (test_cases[0..]) |*tc| {
         std.debug.print("VectorCompositeType of Root - {s}\n", .{tc.id});

@@ -12,6 +12,7 @@ const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 const JsonError = @import("./common.zig").JsonError;
+const Parsed = @import("./type.zig").Parsed;
 
 /// List: ordered variable-length homogeneous collection, limited to N values
 /// ST: ssz element type
@@ -19,9 +20,10 @@ const JsonError = @import("./common.zig").JsonError;
 pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
     const BlockBytes = ArrayList(u8);
     const ArrayBasic = @import("./array_basic.zig").withElementTypes(ST, ZT);
+    const ParsedResult = Parsed([]ZT);
 
     const ListBasicType = struct {
-        allocator: *std.mem.Allocator,
+        allocator: std.mem.Allocator,
         element_type: *ST,
         limit: usize,
         fixed_size: ?usize,
@@ -35,14 +37,14 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
         mix_in_length_block_bytes: []u8,
 
         /// init_capacity is the initial capacity of elements, not bytes
-        pub fn init(allocator: *std.mem.Allocator, element_type: *ST, limit: usize, init_capacity: usize) !@This() {
+        pub fn init(allocator: std.mem.Allocator, element_type: *ST, limit: usize, init_capacity: usize) !@This() {
             const elem_byte_length = element_type.byte_length;
             const init_capacity_bytes = init_capacity * elem_byte_length;
             const max_chunk_count = (limit * elem_byte_length + 31) / 32;
             const chunk_depth = maxChunksToDepth(max_chunk_count);
             // Depth includes the extra level for the length node
             const depth = chunk_depth + 1;
-            return @This(){ .allocator = allocator, .element_type = element_type, .limit = limit, .fixed_size = null, .depth = depth, .chunk_depth = chunk_depth, .max_chunk_count = max_chunk_count, .min_size = 0, .max_size = limit * element_type.max_size, .block_bytes = try BlockBytes.initCapacity(allocator.*, init_capacity_bytes), .mix_in_length_block_bytes = try allocator.alloc(u8, 64) };
+            return @This(){ .allocator = allocator, .element_type = element_type, .limit = limit, .fixed_size = null, .depth = depth, .chunk_depth = chunk_depth, .max_chunk_count = max_chunk_count, .min_size = 0, .max_size = limit * element_type.max_size, .block_bytes = try BlockBytes.initCapacity(allocator, init_capacity_bytes), .mix_in_length_block_bytes = try allocator.alloc(u8, 64) };
         }
 
         pub fn deinit(self: @This()) void {
@@ -96,16 +98,24 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
             try ArrayBasic.deserializeFromBytes(self.element_type, data, out);
         }
 
+        /// public api
+        pub fn fromSsz(self: @This(), ssz: []const u8) !ParsedResult {
+            return ArrayBasic.fromSsz(self, ssz);
+        }
+
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+            return ArrayBasic.fromJson(self, json);
+        }
+
+        pub fn clone(self: @This(), value: []const ZT) !ParsedResult {
+            return ArrayBasic.clone(self, value);
+        }
+
         /// Same to deserializeFromBytes but this returns *T instead of out param
         /// Consumer need to free the memory
         /// out parameter is unused, just to conform to the api
         pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, out: ?[]ZT) ![]ZT {
             return try ArrayBasic.deserializeFromSlice(arenaAllocator, self.element_type, slice, out);
-        }
-
-        /// public api
-        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
-            return ArrayBasic.fromJson(self, arena_allocator, json);
         }
 
         /// Implementation for parent
@@ -119,8 +129,8 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
             return ArrayBasic.valueEquals(self.element_type, a, b);
         }
 
-        pub fn clone(self: @This(), value: []const ZT, out: []ZT) !void {
-            try ArrayBasic.valueClone(self.element_type, value, out);
+        pub fn doClone(self: @This(), arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+            return try ArrayBasic.valueClone(self.element_type, arena_allocator, value, out);
         }
     };
 
@@ -136,7 +146,7 @@ test "deserializeFromBytes" {
     const UintType = @import("./uint.zig").createUintType(8);
     const ListBasicType = createListBasicType(UintType, u64);
     var uintType = try UintType.init();
-    var listType = try ListBasicType.init(&allocator, &uintType, 128, 128);
+    var listType = try ListBasicType.init(allocator, &uintType, 128, 128);
     defer uintType.deinit();
     defer listType.deinit();
 
@@ -173,8 +183,9 @@ test "deserializeFromBytes" {
         try std.testing.expectEqualSlices(u8, tc.root, rootHex);
 
         // clone
-        const cloned = valueMax[tc.value.len..(tc.value.len * 2)];
-        try listType.clone(value, cloned);
+        const cloned_result = try listType.clone(value);
+        defer cloned_result.deinit();
+        const cloned = cloned_result.value;
         var root2 = [_]u8{0} ** 32;
         try listType.hashTreeRoot(cloned[0..], root2[0..]);
         try std.testing.expectEqualSlices(u8, root2[0..], root[0..]);
@@ -193,24 +204,23 @@ test "deserializeFromJson" {
     const UintType = @import("./uint.zig").createUintType(8);
     const ListBasicType = createListBasicType(UintType, u64);
     var uintType = try UintType.init();
-    var listType = try ListBasicType.init(&allocator, &uintType, 4, 2);
+    var listType = try ListBasicType.init(allocator, &uintType, 4, 2);
     defer uintType.deinit();
     defer listType.deinit();
 
     const json = "[\"100000\", \"200000\", \"300000\", \"400000\"]";
     const expected = ([_]u64{ 100000, 200000, 300000, 400000 })[0..];
 
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-
-    const result = try listType.fromJson(arena.allocator(), json);
-    try std.testing.expectEqual(result.len, expected.len);
-    for (result, expected) |a, b| {
+    const result = try listType.fromJson(json);
+    defer result.deinit();
+    try std.testing.expectEqual(result.value.len, expected.len);
+    for (result.value, expected) |a, b| {
         try std.testing.expectEqual(a, b);
     }
 
     // missing "]" at the end
-    if (listType.fromJson(arena.allocator(), "[\"100000\", \"200000\", \"300000\"")) |_| {
+    const malformed_json_result = listType.fromJson("[\"100000\", \"200000\", \"300000\"");
+    if (malformed_json_result) |_| {
         unreachable;
     } else |err| switch (err) {
         error.UnexpectedEndOfInput => {},

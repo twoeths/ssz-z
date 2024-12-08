@@ -1,14 +1,18 @@
 const std = @import("std");
 const Scanner = std.json.Scanner;
 const Allocator = std.mem.Allocator;
+const ArenaAllocator = std.heap.ArenaAllocator;
 const maxChunksToDepth = @import("hash").maxChunksToDepth;
 const merkleize = @import("hash").merkleizeBlocksBytes;
 const sha256Hash = @import("hash").sha256Hash;
 const fromHex = @import("util").fromHex;
 const FromHexError = @import("hash").FromHexError;
+const Parsed = @import("hash").Parsed;
+const ParsedResult = Parsed([]u8);
+const SingleType = @import("./single.zig").withType([]u8);
 
 pub const ByteVectorType = struct {
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     depth: usize,
     chunk_depth: usize,
     fixed_size: ?usize,
@@ -18,7 +22,7 @@ pub const ByteVectorType = struct {
     // this should always be a multiple of 64 bytes
     block_bytes: []u8,
 
-    pub fn init(allocator: *std.mem.Allocator, length_bytes: usize) !@This() {
+    pub fn init(allocator: std.mem.Allocator, length_bytes: usize) !@This() {
         const max_chunk_count: usize = (length_bytes + 31) / 32;
         const chunk_depth = maxChunksToDepth(max_chunk_count);
         const depth = chunk_depth;
@@ -100,12 +104,17 @@ pub const ByteVectorType = struct {
         return result;
     }
 
-    /// fromJson
     /// public function
-    pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) FromHexError![]u8 {
-        const result = try arena_allocator.alloc(u8, self.fixed_size.?);
-        try fromHex(json, result);
-        return result;
+    pub fn fromSsz(self: @This(), ssz: []const u8) !ParsedResult {
+        return SingleType.fromSsz(self, ssz);
+    }
+
+    pub fn fromJson(self: @This(), json: []const u8) FromHexError!ParsedResult {
+        return SingleType.fromJson(self, json);
+    }
+
+    pub fn clone(self: @This(), value: []const u8) !ParsedResult {
+        return SingleType.clone(self, value);
     }
 
     /// Implementation for parent
@@ -132,15 +141,9 @@ pub const ByteVectorType = struct {
         return std.mem.eql(u8, a, b);
     }
 
-    pub fn clone(self: @This(), value: []const u8, out: []u8) !void {
-        if (value.len != self.fixed_size) {
-            return error.InCorrectLen;
-        }
-
-        if (value.len != out.len) {
-            return error.InCorrectLen;
-        }
-
-        @memcpy(out, value);
+    pub fn doClone(self: @This(), arena_allocator: Allocator, value: []const u8, out: ?[]u8) ![]u8 {
+        const out2 = if (out != null) out.? else try arena_allocator.alloc(u8, self.fixed_size.?);
+        @memcpy(out2, value);
+        return out2;
     }
 };

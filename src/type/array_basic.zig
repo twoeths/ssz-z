@@ -5,11 +5,14 @@ const ArrayList = std.ArrayList;
 const Token = std.json.Token;
 const array = @import("./array.zig").withElementTypes;
 const JsonError = @import("./common.zig").JsonError;
+const Parsed = @import("./type.zig").Parsed;
 
 /// ST: ssz element type
 /// ZT: zig type
 pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
     const Array = array(ST, ZT);
+    const ParsedResult = Parsed([]ZT);
+
     const ArrayBasic = struct {
         pub fn serializeToBytes(element_type: *ST, value: []const ZT, out: []u8) !usize {
             const elem_byte_length = element_type.byte_length;
@@ -61,8 +64,16 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return result;
         }
 
-        pub fn fromJson(self: anytype, arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
-            return Array.fromJson(self, arena_allocator, json);
+        pub fn fromSsz(self: anytype, data: []const u8) !ParsedResult {
+            return Array.fromSsz(self, data);
+        }
+
+        pub fn fromJson(self: anytype, json: []const u8) JsonError!ParsedResult {
+            return Array.fromJson(self, json);
+        }
+
+        pub fn clone(self: anytype, value: []const ZT) !ParsedResult {
+            return Array.clone(self, value);
         }
 
         /// consumer need to free the memory
@@ -106,8 +117,8 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return Array.valueEquals(element_type, a, b);
         }
 
-        pub fn valueClone(element_type: *ST, value: []const ZT, out: []ZT) !void {
-            return Array.valueClone(element_type, value, out);
+        pub fn valueClone(element_type: *ST, arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+            return Array.valueClone(element_type, arena_allocator, value, out);
         }
     };
 

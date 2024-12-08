@@ -16,8 +16,7 @@ const TypeTestError = error{
 };
 
 /// ST: ssz type
-/// ZT: zig value type
-pub fn typeTest(comptime ST: type, comptime ZT: type) type {
+pub fn typeTest(comptime ST: type) type {
     const TypeTest = struct {
         pub fn validSszTest(t: *ST, tc: *const TypeTestCase) !void {
             var allocator = std.testing.allocator;
@@ -28,16 +27,15 @@ pub fn typeTest(comptime ST: type, comptime ZT: type) type {
             const serialized = serializedMax[0..((tc.serializedHex.len - 2) / 2)];
             try fromHex(tc.serializedHex, serialized);
 
-            // deserialize
-            var arena = std.heap.ArenaAllocator.init(allocator);
-            defer arena.deinit();
-            const value = try t.deserializeFromSlice(arena.allocator(), serialized, null);
+            // fromSsz
+            const ssz_result = try t.fromSsz(serialized);
+            defer ssz_result.deinit();
+            const value = ssz_result.value;
 
             // fromJson
-            var arena2 = std.heap.ArenaAllocator.init(allocator);
-            defer arena2.deinit();
-            const json_value = try t.fromJson(arena2.allocator(), tc.json);
-            try std.testing.expect(t.equals(value, json_value));
+            const json_result = try t.fromJson(tc.json);
+            defer json_result.deinit();
+            try std.testing.expect(t.equals(value, json_result.value));
 
             // TODO: toJson
 
@@ -54,20 +52,11 @@ pub fn typeTest(comptime ST: type, comptime ZT: type) type {
             try std.testing.expectEqualSlices(u8, tc.rootHex, rootHex);
 
             // clone + equals
-            // Slice
-            const value_type_info = @typeInfo(ZT);
-            if (value_type_info == .Pointer) {
-                const pointer_info = value_type_info.Pointer;
-                if (pointer_info.size == .Slice) {
-                    const elem_type = pointer_info.child;
-                    const cloned = try allocator.alloc(elem_type, value.len);
-                    defer allocator.free(cloned);
-                    try t.clone(value, cloned);
-                    try std.testing.expect(t.equals(value, cloned));
-                }
-            }
+            const cloned_result = try t.clone(value);
+            defer cloned_result.deinit();
+            try std.testing.expect(t.equals(value, cloned_result.value));
 
-            // TODO: handle for other regular types
+            // TODO: serialize, toJson on cloned value?
         }
     };
 

@@ -9,15 +9,17 @@ const toRootHex = @import("util").toRootHex;
 const initZeroHash = @import("hash").initZeroHash;
 const deinitZeroHash = @import("hash").deinitZeroHash;
 const JsonError = @import("./common.zig").JsonError;
+const Parsed = @import("./type.zig").Parsed;
 
 /// Vector: Ordered fixed-length homogeneous collection, with N values
 /// ST: ssz element type
 /// ZT: zig element type
 pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
     const ArrayBasic = @import("./array_basic.zig").withElementTypes(ST, ZT);
+    const ParsedResult = Parsed([]ZT);
 
     const VectorBasicType = struct {
-        allocator: *std.mem.Allocator,
+        allocator: std.mem.Allocator,
         element_type: *ST,
         length: usize,
         fixed_size: ?usize,
@@ -29,7 +31,7 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
         // this should always be a multiple of 64 bytes
         block_bytes: []u8,
 
-        pub fn init(allocator: *std.mem.Allocator, element_type: *ST, length: usize) !@This() {
+        pub fn init(allocator: std.mem.Allocator, element_type: *ST, length: usize) !@This() {
             const elem_byte_length = element_type.byte_length;
             const byte_len = elem_byte_length * length;
             const max_chunk_count: usize = (byte_len + 31 / 32);
@@ -101,10 +103,18 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
             return try ArrayBasic.deserializeFromSlice(arenaAllocator, self.element_type, slice, out);
         }
 
-        /// fromJson
         /// public api
-        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError![]ZT {
-            return ArrayBasic.fromJson(self, arena_allocator, json);
+        pub fn fromSsz(self: @This(), ssz: []const u8) !ParsedResult {
+            return ArrayBasic.fromSsz(self, ssz);
+        }
+
+        /// fromJson
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+            return ArrayBasic.fromJson(self, json);
+        }
+
+        pub fn clone(self: @This(), value: []const ZT) !ParsedResult {
+            return ArrayBasic.clone(self, value);
         }
 
         /// Implementation for parent
@@ -118,8 +128,8 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
             return ArrayBasic.valueEquals(self.element_type, a, b);
         }
 
-        pub fn clone(self: @This(), value: []const ZT, out: []ZT) !void {
-            return ArrayBasic.valueClone(self.element_type, value, out);
+        pub fn doClone(self: @This(), arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+            return try ArrayBasic.valueClone(self.element_type, arena_allocator, value, out);
         }
     };
 
@@ -135,7 +145,7 @@ test "deserializeFromBytes" {
     const UintType = @import("./uint.zig").createUintType(8);
     const VectorBasicType = createVectorBasicType(UintType, u64);
     var uintType = try UintType.init();
-    var vectorType = try VectorBasicType.init(&allocator, &uintType, 8);
+    var vectorType = try VectorBasicType.init(allocator, &uintType, 8);
     defer uintType.deinit();
     defer vectorType.deinit();
 
@@ -168,8 +178,9 @@ test "deserializeFromBytes" {
         try std.testing.expectEqualSlices(u8, tc.root, rootHex);
 
         // clone
-        const cloned = valueMax[tc.value.len..(tc.value.len * 2)];
-        try vectorType.clone(value, cloned);
+        const cloned_result = try vectorType.clone(value);
+        defer cloned_result.deinit();
+        const cloned = cloned_result.value;
         var root2 = [_]u8{0} ** 32;
         try vectorType.hashTreeRoot(cloned[0..], root2[0..]);
         try std.testing.expectEqualSlices(u8, root2[0..], root[0..]);
@@ -188,23 +199,22 @@ test "deserializeFromJson" {
     const UintType = @import("./uint.zig").createUintType(8);
     const VectorBasicType = createVectorBasicType(UintType, u64);
     var uintType = try UintType.init();
-    var vectorType = try VectorBasicType.init(&allocator, &uintType, 4);
+    var vectorType = try VectorBasicType.init(allocator, &uintType, 4);
     defer uintType.deinit();
     defer vectorType.deinit();
 
     const json = "[\"100000\", \"200000\", \"300000\", \"400000\"]";
     const expected = ([_]u64{ 100000, 200000, 300000, 400000 })[0..];
 
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-
-    const result = try vectorType.fromJson(arena.allocator(), json);
-    try std.testing.expectEqual(result.len, expected.len);
-    for (result, expected) |a, b| {
+    const result = try vectorType.fromJson(json);
+    defer result.deinit();
+    try std.testing.expectEqual(result.value.len, expected.len);
+    for (result.value, expected) |a, b| {
         try std.testing.expectEqual(a, b);
     }
 
-    if (vectorType.fromJson(arena.allocator(), "[\"100000\", \"200000\", \"300000\"]")) |_| {
+    const malformed_json_result = vectorType.fromJson("[\"100000\", \"200000\", \"300000\"]");
+    if (malformed_json_result) |_| {
         unreachable;
     } else |err| switch (err) {
         error.InCorrectLen => {},

@@ -6,7 +6,7 @@ const sha256Hash = @import("hash").sha256Hash;
 const TestCase = @import("common.zig").TypeTestCase;
 
 test "ContainerType with 2 uints" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const UintType = createUintType(8);
     const uintType = try UintType.init();
     defer uintType.deinit();
@@ -21,7 +21,7 @@ test "ContainerType with 2 uints" {
     };
 
     const ContainerType = createContainerType(SszType, ZigType, sha256Hash);
-    var containerType = try ContainerType.init(&allocator, SszType{
+    var containerType = try ContainerType.init(allocator, SszType{
         .a = uintType,
         .b = uintType,
     });
@@ -46,7 +46,7 @@ test "ContainerType with 2 uints" {
         },
     };
 
-    const TypeTest = @import("common.zig").typeTest(ContainerType, *ZigType);
+    const TypeTest = @import("common.zig").typeTest(ContainerType);
     for (testCases[0..]) |*tc| {
         // TODO: find other way not to write to stderror
         // may have to use `zig build test 2>&1` on CI?
@@ -58,13 +58,13 @@ test "ContainerType with 2 uints" {
 // TODO: ContainerType with ByteVectorType
 
 test "ContainerType with ListBasicType(uint64, 128) and uint64" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const UintType = createUintType(8);
     var uintType = try UintType.init();
     defer uintType.deinit();
 
     const ListBasicType = createListBasicType(UintType, u64);
-    var listBasicType = try ListBasicType.init(&allocator, &uintType, 128, 128);
+    var listBasicType = try ListBasicType.init(allocator, &uintType, 128, 128);
     defer listBasicType.deinit();
 
     const SszType = struct {
@@ -77,7 +77,7 @@ test "ContainerType with ListBasicType(uint64, 128) and uint64" {
     };
 
     const ContainerType = createContainerType(SszType, ZigType, sha256Hash);
-    var containerType = try ContainerType.init(&allocator, SszType{
+    var containerType = try ContainerType.init(allocator, SszType{
         .a = listBasicType,
         .b = uintType,
     });
@@ -102,7 +102,7 @@ test "ContainerType with ListBasicType(uint64, 128) and uint64" {
         },
     };
 
-    const TypeTest = @import("common.zig").typeTest(ContainerType, *ZigType);
+    const TypeTest = @import("common.zig").typeTest(ContainerType);
     for (testCases[0..]) |*tc| {
         // TODO: find other way not to write to stderror
         // may have to use `zig build test 2>&1` on CI?

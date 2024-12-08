@@ -2,12 +2,14 @@ const std = @import("std");
 const Token = std.json.Token;
 const Scanner = std.json.Scanner;
 const Allocator = std.mem.Allocator;
+const ArenaAllocator = std.heap.ArenaAllocator;
 const expect = std.testing.expect;
 const merkleize = @import("hash").merkleizeBlocksBytes;
 const HashFn = @import("hash").HashFn;
 const sha256Hash = @import("hash").sha256Hash;
 const toRootHex = @import("util").toRootHex;
 const JsonError = @import("./common.zig").JsonError;
+const Parsed = @import("./type.zig").Parsed;
 
 const BytesRange = struct {
     start: usize,
@@ -21,9 +23,11 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
     const zig_fields_info = @typeInfo(ZT).Struct.fields;
     const max_chunk_count = zig_fields_info.len;
     const native_endian = @import("builtin").target.cpu.arch.endian();
+    const SingleType = @import("./single.zig").withType(ZT);
+    const ParsedResult = Parsed(ZT);
 
     const ContainerType = struct {
-        allocator: *Allocator,
+        allocator: Allocator,
         // TODO: *ST to avoid copy
         ssz_fields: ST,
         // a sha256 block is 64 byte
@@ -34,7 +38,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         fixed_end: usize,
         variable_field_count: usize,
 
-        pub fn init(allocator: *Allocator, ssz_fields: ST) !@This() {
+        pub fn init(allocator: Allocator, ssz_fields: ST) !@This() {
             var min_size: usize = 0;
             var max_size: usize = 0;
             var fixed_size: ?usize = 0;
@@ -140,6 +144,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return variable_index;
         }
 
+        // TODO: not sure if we need this or not as there is no way to know the size of internal slice size
         pub fn deserializeFromBytes(self: @This(), data: []const u8, out: *ZT) !void {
             // TODO: validate data length
             // max_chunk_count is known at compile time so we can allocate on stack
@@ -150,19 +155,25 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 const ssz_type = &@field(self.ssz_fields, field_name);
                 const field_range = field_ranges[i];
                 const field_data = data[field_range.start..field_range.end];
-                // this works, but it needs a copy of data
-                // var field_value: field_info.type = undefined;
-                // try ssz_type.deserializeFromBytes(field_data, &field_value);
-                // @field(out, field_name) = field_value;
-
-                // this involves a copy of data, and DOES NOT work
-                // var field_value = @field(out, field_name);
-                // try ssz_type.deserializeFromBytes(field_data, &field_value);
-                // @field(out, field_name) = field_value;
-
                 // no copy of data, and it works
                 try ssz_type.deserializeFromBytes(field_data, &@field(out, field_name));
             }
+        }
+
+        /// public function for consumers
+        /// TODO: straight forward error type
+        pub fn fromSsz(self: @This(), ssz: []const u8) !ParsedResult {
+            return SingleType.fromSsz(self, ssz);
+        }
+
+        /// public function for consumers
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+            return SingleType.fromJson(self, json);
+        }
+
+        // public function for consumers
+        pub fn clone(self: @This(), value: *const ZT) !ParsedResult {
+            return SingleType.clone(self, value);
         }
 
         /// for embedded struct, it's allocated by the parent struct
@@ -190,23 +201,9 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return out2;
         }
 
-        /// public function for consumers
-        pub fn fromJson(self: @This(), arena_allocator: Allocator, json: []const u8) JsonError!*ZT {
-            var source = Scanner.initCompleteInput(arena_allocator, json);
-            defer source.deinit();
-            const zt = try self.deserializeFromJson(arena_allocator, &source, null);
-            const end_document_token = try source.next();
-            switch (end_document_token) {
-                Token.end_of_document => {},
-                else => return error.InvalidJson,
-            }
-            return zt;
-        }
-
         /// a recursive implementation for parent types or fromJson
         pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, out: ?*ZT) JsonError!*ZT {
             var out2 = if (out != null) out.? else try arena_allocator.create(ZT);
-
             // validate begin token "{"
             const begin_object_token = try source.next();
             if (begin_object_token != Token.object_begin) {
@@ -256,13 +253,19 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return true;
         }
 
-        pub fn clone(self: @This(), value: *const ZT, out: *ZT) !void {
+        pub fn doClone(self: @This(), arena_allocator: Allocator, value: *const ZT, out: ?*ZT) !*ZT {
+            var out2 = if (out != null) out.? else try arena_allocator.create(ZT);
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const ssz_type = &@field(self.ssz_fields, field_name);
-                const field_value_ptr = &@field(value, field_name);
-                try ssz_type.clone(field_value_ptr, &@field(out, field_name));
+                if (@typeInfo(field_info.type) == .Pointer) {
+                    @field(out2, field_name) = try ssz_type.doClone(arena_allocator, @field(value, field_name), null);
+                } else {
+                    _ = try ssz_type.doClone(arena_allocator, &@field(value, field_name), &@field(out2, field_name));
+                }
             }
+
+            return out2;
         }
 
         // private functions
@@ -336,7 +339,7 @@ test "basic ContainerType {x: uint, y:uint}" {
         y: u64,
     };
     const ContainerType = createContainerType(SszType, ZigType, sha256Hash);
-    var containerType = try ContainerType.init(&allocator, SszType{
+    var containerType = try ContainerType.init(allocator, SszType{
         .x = uintType,
         .y = uintType,
     });
@@ -363,19 +366,19 @@ test "basic ContainerType {x: uint, y:uint}" {
     try expect(containerType.equals(&obj, &obj2));
 
     // clone
-    var obj3: ZigType = undefined;
-    try containerType.clone(&obj, &obj3);
-    try expect(containerType.equals(&obj, &obj3));
+    const cloned_result = try containerType.clone(&obj);
+    defer cloned_result.deinit();
+    const obj3 = cloned_result.value;
+    try expect(containerType.equals(&obj, obj3));
     try expect(obj3.x == obj.x);
     try expect(obj3.y == obj.y);
 
     // fromJson
     const json = "{ \"x\": \"18446744073709551615\", \"y\": \"0\" }";
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-    const obj4 = try containerType.fromJson(arena.allocator(), json);
-    try expect(obj4.x == obj.x);
-    try expect(obj4.y == obj.y);
+    const parsed = try containerType.fromJson(json);
+    defer parsed.deinit();
+    try expect(parsed.value.x == obj.x);
+    try expect(parsed.value.y == obj.y);
 }
 
 test "ContainerType with embedded struct" {
@@ -392,7 +395,7 @@ test "ContainerType with embedded struct" {
         y: u64,
     };
     const ContainerType0 = createContainerType(SszType0, ZigType0, sha256Hash);
-    const containerType0 = try ContainerType0.init(&allocator, SszType0{
+    const containerType0 = try ContainerType0.init(allocator, SszType0{
         .x = uintType,
         .y = uintType,
     });
@@ -407,7 +410,7 @@ test "ContainerType with embedded struct" {
         b: ZigType0,
     };
     const ContainerType1 = createContainerType(SszType1, ZigType1, sha256Hash);
-    var containerType1 = try ContainerType1.init(&allocator, SszType1{
+    var containerType1 = try ContainerType1.init(allocator, SszType1{
         .a = containerType0,
         .b = containerType0,
     });
@@ -439,23 +442,23 @@ test "ContainerType with embedded struct" {
     try std.testing.expectEqualSlices(u8, root[0..], root2[0..]);
 
     // clone, equal
-    var obj3: ZigType1 = undefined;
-    try containerType1.clone(&obj, &obj3);
-    try expect(containerType1.equals(&obj, &obj3));
+    const cloned_result = try containerType1.clone(&obj);
+    defer cloned_result.deinit();
+    const obj3 = cloned_result.value;
+    try expect(containerType1.equals(&obj, obj3));
     var root3 = [_]u8{0} ** 32;
-    try containerType1.hashTreeRoot(&obj3, root3[0..]);
+    try containerType1.hashTreeRoot(obj3, root3[0..]);
     try std.testing.expectEqualSlices(u8, root[0..], root3[0..]);
     obj3.a.x = 2024;
     try expect(obj.a.x != obj3.a.x);
 
     // fromJson
     const json = "{ \"a\": { \"x\": \"18446744073709551615\", \"y\": \"0\" }, \"b\": { \"x\": \"0\", \"y\": \"18446744073709551615\" } }";
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-    const obj4 = try containerType1.fromJson(arena.allocator(), json);
-    try expect(obj4.a.x == obj.a.x);
-    try expect(obj4.a.y == obj.a.y);
-    try expect(obj4.b.x == obj.b.x);
-    try expect(obj4.b.y == obj.b.y);
-    try expect(containerType1.equals(&obj, obj4));
+    const parsed = try containerType1.fromJson(json);
+    defer parsed.deinit();
+    try expect(parsed.value.a.x == obj.a.x);
+    try expect(parsed.value.a.y == obj.a.y);
+    try expect(parsed.value.b.x == obj.b.x);
+    try expect(parsed.value.b.y == obj.b.y);
+    try expect(containerType1.equals(&obj, parsed.value));
 }

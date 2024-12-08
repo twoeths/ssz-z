@@ -1,21 +1,26 @@
 const std = @import("std");
+const ArenaAllocator = std.heap.ArenaAllocator;
+const Allocator = std.mem.Allocator;
 const Scanner = std.json.Scanner;
 const JsonError = @import("./common.zig").JsonError;
+const Parsed = @import("./type.zig").Parsed;
 
 /// ST: ssz element type
 /// ZT: zig type
 pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
+    const ParsedResult = Parsed([]ZT);
+    const SingleType = @import("./single.zig").withType([]ZT);
     const Array = struct {
-        pub fn fromJson(self: anytype, arena_allocator: std.mem.Allocator, json: []const u8) JsonError![]ZT {
-            var source = Scanner.initCompleteInput(arena_allocator, json);
-            defer source.deinit();
-            const result = try self.deserializeFromJson(arena_allocator, &source, null);
-            const end_document_token = try source.next();
-            switch (end_document_token) {
-                .end_of_document => {},
-                else => return error.InvalidJson,
-            }
-            return result;
+        pub fn fromSsz(self: anytype, ssz: []const u8) !ParsedResult {
+            return SingleType.fromSsz(self, ssz);
+        }
+
+        pub fn fromJson(self: anytype, json: []const u8) JsonError!ParsedResult {
+            return SingleType.fromJson(self, json);
+        }
+
+        pub fn clone(self: anytype, value: []const ZT) !ParsedResult {
+            return SingleType.clone(self, value);
         }
 
         pub fn valueEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {
@@ -35,13 +40,25 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return true;
         }
 
-        pub fn valueClone(element_type: *ST, value: []const ZT, out: []ZT) !void {
-            for (value, out) |*elem, *out_elem| {
-                // ZT could be a slice, in that case we should pass elem itself instead of pointer to pointer
-                const elem_ptr = if (@typeInfo(@TypeOf(elem.*)) == .Pointer) elem.* else elem;
-                const out_elem_ptr = if (@typeInfo(@TypeOf(out_elem.*)) == .Pointer) out_elem.* else out_elem;
-                try element_type.clone(elem_ptr, out_elem_ptr);
+        pub fn valueClone(element_type: *ST, arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+            const out2 = if (out != null) out.? else try arena_allocator.alloc(ZT, value.len);
+            if (out2.len != value.len) {
+                return error.InCorrectLen;
             }
+
+            for (value, out2, 0..) |*elem, *out_elem, i| {
+                if (@typeInfo(ZT) == .Pointer) {
+                    // ZT could be a slice, in that case we should pass elem itself instead of pointer to pointer
+                    const elem_ptr = elem.*;
+                    out2[i] = try element_type.doClone(arena_allocator, elem_ptr, null);
+                } else {
+                    const elem_ptr = elem;
+                    const out_elem_ptr = out_elem;
+                    _ = try element_type.doClone(arena_allocator, elem_ptr, out_elem_ptr);
+                }
+            }
+
+            return out2;
         }
     };
 
