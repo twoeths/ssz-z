@@ -9,15 +9,14 @@ const createVectorCompositeType = @import("ssz").createVectorCompositeType;
 
 test "VectorCompositeType of Root" {
     const test_cases = [_]TestCase{
-        // TODO: fix clone() issue
-        // TestCase{
-        // .id = "4 roots",
-        // .serializedHex = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        // .json =
-        // \\["0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"]
-        // ,
-        // .rootHex = "0x56019bafbc63461b73e21c6eae0c62e8d5b8e05cb0ac065777dc238fcf9604e6",
-        // },
+        TestCase{
+            .id = "4 roots",
+            .serializedHex = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            .json =
+            \\["0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"]
+            ,
+            .rootHex = "0x56019bafbc63461b73e21c6eae0c62e8d5b8e05cb0ac065777dc238fcf9604e6",
+        },
     };
 
     const allocator = std.testing.allocator;
@@ -29,7 +28,7 @@ test "VectorCompositeType of Root" {
     var vector_composite_type = try VectorCompositeType.init(allocator, &byte_vector_type, 4);
     defer vector_composite_type.deinit();
 
-    const TypeTest = @import("common.zig").typeTest(VectorCompositeType, [][]u8);
+    const TypeTest = @import("common.zig").typeTest(VectorCompositeType);
 
     for (test_cases[0..]) |*tc| {
         std.debug.print("VectorCompositeType of Root - {s}\n", .{tc.id});

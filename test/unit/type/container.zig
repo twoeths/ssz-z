@@ -46,7 +46,7 @@ test "ContainerType with 2 uints" {
         },
     };
 
-    const TypeTest = @import("common.zig").typeTest(ContainerType, *ZigType);
+    const TypeTest = @import("common.zig").typeTest(ContainerType);
     for (testCases[0..]) |*tc| {
         // TODO: find other way not to write to stderror
         // may have to use `zig build test 2>&1` on CI?
@@ -102,7 +102,7 @@ test "ContainerType with ListBasicType(uint64, 128) and uint64" {
         },
     };
 
-    const TypeTest = @import("common.zig").typeTest(ContainerType, *ZigType);
+    const TypeTest = @import("common.zig").typeTest(ContainerType);
     for (testCases[0..]) |*tc| {
         // TODO: find other way not to write to stderror
         // may have to use `zig build test 2>&1` on CI?

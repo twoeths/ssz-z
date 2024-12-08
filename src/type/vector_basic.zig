@@ -16,6 +16,7 @@ const Parsed = @import("./type.zig").Parsed;
 /// ZT: zig element type
 pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
     const ArrayBasic = @import("./array_basic.zig").withElementTypes(ST, ZT);
+    const ParsedResult = Parsed([]ZT);
 
     const VectorBasicType = struct {
         allocator: std.mem.Allocator,
@@ -103,13 +104,17 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
         }
 
         /// public api
-        pub fn fromSsz(self: @This(), ssz: []const u8) !Parsed([]ZT) {
+        pub fn fromSsz(self: @This(), ssz: []const u8) !ParsedResult {
             return ArrayBasic.fromSsz(self, ssz);
         }
 
         /// fromJson
-        pub fn fromJson(self: @This(), json: []const u8) JsonError!Parsed([]ZT) {
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
             return ArrayBasic.fromJson(self, json);
+        }
+
+        pub fn clone(self: @This(), value: []const ZT) !ParsedResult {
+            return ArrayBasic.clone(self, value);
         }
 
         /// Implementation for parent
@@ -123,8 +128,8 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
             return ArrayBasic.valueEquals(self.element_type, a, b);
         }
 
-        pub fn clone(self: @This(), value: []const ZT, out: []ZT) !void {
-            return ArrayBasic.valueClone(self.element_type, value, out);
+        pub fn doClone(self: @This(), arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+            return try ArrayBasic.valueClone(self.element_type, arena_allocator, value, out);
         }
     };
 
@@ -173,8 +178,9 @@ test "deserializeFromBytes" {
         try std.testing.expectEqualSlices(u8, tc.root, rootHex);
 
         // clone
-        const cloned = valueMax[tc.value.len..(tc.value.len * 2)];
-        try vectorType.clone(value, cloned);
+        const cloned_result = try vectorType.clone(value);
+        defer cloned_result.deinit();
+        const cloned = cloned_result.value;
         var root2 = [_]u8{0} ** 32;
         try vectorType.hashTreeRoot(cloned[0..], root2[0..]);
         try std.testing.expectEqualSlices(u8, root2[0..], root[0..]);

@@ -21,6 +21,7 @@ const Parsed = @import("./type.zig").Parsed;
 /// - Composite types are always returned as views
 pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
     const ArrayComposite = @import("./array_composite.zig").withElementTypes(ST, ZT);
+    const ParsedResult = Parsed([]ZT);
 
     const VectorCompositeType = struct {
         allocator: std.mem.Allocator,
@@ -114,12 +115,16 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
         }
 
         /// public api
-        pub fn fromSsz(self: @This(), ssz: []const u8) !Parsed([]ZT) {
+        pub fn fromSsz(self: @This(), ssz: []const u8) !ParsedResult {
             return ArrayComposite.fromSsz(self, ssz);
         }
 
-        pub fn fromJson(self: @This(), json: []const u8) JsonError!Parsed([]ZT) {
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
             return ArrayComposite.fromJson(self, json);
+        }
+
+        pub fn clone(self: @This(), value: []const ZT) !ParsedResult {
+            return ArrayComposite.clone(self, value);
         }
 
         /// out parameter is not used because memory is always allocated inside the function
@@ -131,8 +136,8 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
             return ArrayComposite.valueEquals(self.element_type, a, b);
         }
 
-        pub fn clone(self: @This(), value: []const ZT, out: []ZT) !void {
-            try ArrayComposite.valueClone(self.element_type, value, out);
+        pub fn doClone(self: @This(), arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+            return try ArrayComposite.valueClone(self.element_type, arena_allocator, value, out);
         }
     };
 

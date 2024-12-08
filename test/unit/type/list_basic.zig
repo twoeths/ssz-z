@@ -36,7 +36,7 @@ test "valid test for ListBasicType" {
     defer uintType.deinit();
     defer listType.deinit();
 
-    const TypeTest = @import("common.zig").typeTest(ListBasicType, []u64);
+    const TypeTest = @import("common.zig").typeTest(ListBasicType);
 
     for (testCases[0..]) |*tc| {
         // TODO: find other way not to write to stderror

@@ -89,13 +89,16 @@ pub fn createUintType(comptime num_bytes: usize) type {
             return result;
         }
 
-        /// Json
         /// public function
+        /// TODO: fromSsz()?
+        /// Json
         pub fn fromJson(_: @This(), arena_allocator: Allocator, json: []const u8) JsonError!*T {
             const result = try arena_allocator.create(T);
             result.* = try sliceToInt(T, json);
             return result;
         }
+
+        // TODO: clone?
 
         /// an implementation for parent types
         pub fn deserializeFromJson(_: @This(), arena_allocator: Allocator, source: *Scanner, out: ?*T) JsonError!*T {
@@ -116,11 +119,14 @@ pub fn createUintType(comptime num_bytes: usize) type {
             return a.* == b.*;
         }
 
-        pub fn clone(_: @This(), value: *const T, out: *T) !void {
+        pub fn doClone(_: @This(), arena_allocator: Allocator, value: *const T, out: ?*T) !*T {
+            const out2 = if (out != null) out.? else try arena_allocator.create(T);
             if (value.* < 0) {
                 return error.InvalidInput;
             }
-            out.* = value.*;
+            out2.* = value.*;
+
+            return out2;
         }
     };
 }
