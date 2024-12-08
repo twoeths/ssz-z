@@ -23,7 +23,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return SingleType.clone(self, value);
         }
 
-        pub fn valueEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {
+        pub fn itemEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {
             if (a.len != b.len) {
                 return false;
             }
@@ -40,7 +40,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return true;
         }
 
-        pub fn valueClone(element_type: *ST, arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+        pub fn itemClone(element_type: *ST, arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
             const out2 = if (out != null) out.? else try arena_allocator.alloc(ZT, value.len);
             if (out2.len != value.len) {
                 return error.InCorrectLen;

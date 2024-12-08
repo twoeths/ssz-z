@@ -175,12 +175,12 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return arraylist.toOwnedSlice();
         }
 
-        pub fn valueEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {
-            return Array.valueEquals(element_type, a, b);
+        pub fn itemEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {
+            return Array.itemEquals(element_type, a, b);
         }
 
-        pub fn valueClone(element_type: *ST, arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
-            return Array.valueClone(element_type, arena_allocator, value, out);
+        pub fn itemClone(element_type: *ST, arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+            return Array.itemClone(element_type, arena_allocator, value, out);
         }
 
         // consumer should free the returned array

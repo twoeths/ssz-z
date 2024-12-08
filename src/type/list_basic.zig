@@ -126,11 +126,11 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
         }
 
         pub fn equals(self: @This(), a: []const ZT, b: []const ZT) bool {
-            return ArrayBasic.valueEquals(self.element_type, a, b);
+            return ArrayBasic.itemEquals(self.element_type, a, b);
         }
 
         pub fn doClone(self: @This(), arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
-            return try ArrayBasic.valueClone(self.element_type, arena_allocator, value, out);
+            return try ArrayBasic.itemClone(self.element_type, arena_allocator, value, out);
         }
     };
 
