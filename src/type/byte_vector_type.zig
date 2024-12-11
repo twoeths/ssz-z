@@ -10,6 +10,7 @@ const FromHexError = @import("hash").FromHexError;
 const Parsed = @import("hash").Parsed;
 const ParsedResult = Parsed([]u8);
 const SszError = @import("./common.zig").SszError;
+const HashError = @import("./common.zig").HashError;
 const SingleType = @import("./single.zig").withType([]u8);
 
 pub const ByteVectorType = struct {
@@ -48,7 +49,7 @@ pub const ByteVectorType = struct {
         self.allocator.free(self.block_bytes);
     }
 
-    pub fn hashTreeRoot(self: *@This(), value: []const u8, out: []u8) !void {
+    pub fn hashTreeRoot(self: *@This(), value: []const u8, out: []u8) HashError!void {
         if (out.len != 32) {
             return error.InCorrectLen;
         }

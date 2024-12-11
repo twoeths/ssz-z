@@ -6,6 +6,7 @@ const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 const JsonError = @import("./common.zig").JsonError;
 const SszError = @import("./common.zig").SszError;
+const HashError = @import("./common.zig").HashError;
 
 pub fn createUintType(comptime num_bytes: usize) type {
     if (num_bytes != 2 and num_bytes != 4 and num_bytes != 8) {
@@ -33,7 +34,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
             // do nothing
         }
 
-        pub fn hashTreeRoot(_: @This(), value: *const T, out: []u8) !void {
+        pub fn hashTreeRoot(_: @This(), value: *const T, out: []u8) HashError!void {
             if (out.len != 32) {
                 return error.InCorrectLen;
             }

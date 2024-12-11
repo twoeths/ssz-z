@@ -9,6 +9,7 @@ const deinitZeroHash = @import("hash").deinitZeroHash;
 const toRootHex = @import("util").toRootHex;
 const fromHex = @import("util").fromHex;
 const SszError = @import("./common.zig").SszError;
+const HashError = @import("./common.zig").HashError;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 
@@ -36,7 +37,7 @@ pub fn createByteListType(comptime limit_bytes: usize) type {
             self.allocator.free(self.mix_in_length_block_bytes);
         }
 
-        pub fn hashTreeRoot(self: *@This(), value: []const u8, out: []u8) !void {
+        pub fn hashTreeRoot(self: *@This(), value: []const u8, out: []u8) HashError!void {
             if (out.len != 32) {
                 return error.InCorrectLen;
             }

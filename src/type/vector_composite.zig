@@ -13,6 +13,7 @@ const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 const JsonError = @import("./common.zig").JsonError;
 const SszError = @import("./common.zig").SszError;
+const HashError = @import("./common.zig").HashError;
 const Parsed = @import("./type.zig").Parsed;
 
 /// Vector: Ordered fixed-length homogeneous collection, with N values
@@ -65,7 +66,7 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
             self.allocator.free(self.block_bytes);
         }
 
-        pub fn hashTreeRoot(self: *@This(), value: []const ZT, out: []u8) !void {
+        pub fn hashTreeRoot(self: *@This(), value: []const ZT, out: []u8) HashError!void {
             if (value.len != self.default_len) {
                 return error.InCorrectLen;
             }

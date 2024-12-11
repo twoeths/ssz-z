@@ -10,6 +10,7 @@ const sha256Hash = @import("hash").sha256Hash;
 const toRootHex = @import("util").toRootHex;
 const JsonError = @import("./common.zig").JsonError;
 const SszError = @import("./common.zig").SszError;
+const HashError = @import("./common.zig").HashError;
 const Parsed = @import("./type.zig").Parsed;
 
 const BytesRange = struct {
@@ -82,7 +83,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             self.allocator.free(self.blocks_bytes);
         }
 
-        pub fn hashTreeRoot(self: *@This(), value: *const ZT, out: []u8) !void {
+        pub fn hashTreeRoot(self: *@This(), value: *const ZT, out: []u8) HashError!void {
             if (out.len != 32) {
                 return error.InCorrectLen;
             }
