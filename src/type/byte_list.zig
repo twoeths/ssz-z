@@ -37,6 +37,7 @@ pub fn createByteListType(comptime limit_bytes: usize) type {
             self.allocator.free(self.mix_in_length_block_bytes);
         }
 
+        /// public apis
         pub fn hashTreeRoot(self: *@This(), value: []const u8, out: []u8) HashError!void {
             if (out.len != 32) {
                 return error.InCorrectLen;
@@ -70,6 +71,25 @@ pub fn createByteListType(comptime limit_bytes: usize) type {
             try merkleize(sha256Hash, self.mix_in_length_block_bytes, chunk_count, out);
         }
 
+        pub fn fromJson(_: @This(), arena_allocator: Allocator, json: []const u8) ![]u8 {
+            const len = if (json.len >= 2 and (json[0] == '0' and (json[1] == 'x' or json[1] == 'X'))) (json.len - 2) / 2 else json.len / 2;
+            const result = try arena_allocator.alloc(u8, len);
+            try fromHex(json, result);
+            return result;
+        }
+
+        pub fn equals(_: @This(), a: []const u8, b: []const u8) bool {
+            return std.mem.allEqual(u8, a, b);
+        }
+
+        pub fn clone(_: @This(), value: []const u8, out: []u8) SszError!void {
+            if (value.len > limit_bytes or value.len != out.len) {
+                return error.InCorrectLen;
+            }
+
+            std.mem.copyForwards(u8, out, value);
+        }
+
         // TODO: make sure this works with parent as containerType, make a unit test for it
         pub fn serializedSize(_: @This(), value: []const u8) usize {
             return value.len;
@@ -91,15 +111,6 @@ pub fn createByteListType(comptime limit_bytes: usize) type {
 
         // TODO: serializeToBytes
 
-        /// fromJson
-        /// public function
-        pub fn fromJson(_: @This(), arena_allocator: Allocator, json: []const u8) ![]u8 {
-            const len = if (json.len >= 2 and (json[0] == '0' and (json[1] == 'x' or json[1] == 'X'))) (json.len - 2) / 2 else json.len / 2;
-            const result = try arena_allocator.alloc(u8, len);
-            try fromHex(json, result);
-            return result;
-        }
-
         //// Implementation for parent
         /// Consumer need to free the memory
         /// out parameter is unused because parent does not allocate, just to conform to the api
@@ -119,18 +130,6 @@ pub fn createByteListType(comptime limit_bytes: usize) type {
                 },
                 else => error.InvalidJson,
             };
-        }
-
-        pub fn equals(_: @This(), a: []const u8, b: []const u8) bool {
-            return std.mem.allEqual(u8, a, b);
-        }
-
-        pub fn clone(_: @This(), value: []const u8, out: []u8) SszError!void {
-            if (value.len > limit_bytes or value.len != out.len) {
-                return error.InCorrectLen;
-            }
-
-            std.mem.copyForwards(u8, out, value);
         }
     };
 

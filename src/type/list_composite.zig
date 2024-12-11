@@ -67,6 +67,7 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
             self.allocator.free(self.mix_in_length_block_bytes);
         }
 
+        /// public apis
         pub fn hashTreeRoot(self: *@This(), value: []const ZT, out: []u8) HashError!void {
             if (value.len > self.limit) {
                 return error.InCorrectLen;
@@ -102,6 +103,18 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
             try merkleize(sha256Hash, self.mix_in_length_block_bytes, chunk_count, out);
         }
 
+        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
+            return ArrayComposite.fromSsz(self, ssz);
+        }
+
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+            return ArrayComposite.fromJson(self, json);
+        }
+
+        pub fn clone(self: @This(), value: []const ZT) SszError!ParsedResult {
+            return ArrayComposite.clone(self, value);
+        }
+
         // Serialization + deserialization
         pub fn serializedSize(self: @This(), value: []const ZT) usize {
             return ArrayComposite.serializedSize(self.element_type, value);
@@ -123,19 +136,6 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
 
         pub fn deserializeFromSlice(self: @This(), arena_allocator: Allocator, data: []const u8, _: ?[]ZT) SszError![]ZT {
             return try ArrayComposite.deserializeFromSlice(arena_allocator, self.element_type, data, null);
-        }
-
-        /// public api
-        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
-            return ArrayComposite.fromSsz(self, ssz);
-        }
-
-        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
-            return ArrayComposite.fromJson(self, json);
-        }
-
-        pub fn clone(self: @This(), value: []const ZT) SszError!ParsedResult {
-            return ArrayComposite.clone(self, value);
         }
 
         /// out parameter is not used because memory is always allocated inside the function

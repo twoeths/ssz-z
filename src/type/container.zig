@@ -20,7 +20,6 @@ const BytesRange = struct {
 
 // create a ssz type from type of an ssz object
 // type of zig type will be used once and checked inside hashTreeRoot() function
-// TODO: define error types similar to JsonError for all apis
 pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn) type {
     const zig_fields_info = @typeInfo(ZT).Struct.fields;
     const max_chunk_count = zig_fields_info.len;

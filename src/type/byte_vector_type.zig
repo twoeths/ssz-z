@@ -49,6 +49,7 @@ pub const ByteVectorType = struct {
         self.allocator.free(self.block_bytes);
     }
 
+    /// public apis
     pub fn hashTreeRoot(self: *@This(), value: []const u8, out: []u8) HashError!void {
         if (out.len != 32) {
             return error.InCorrectLen;
@@ -65,6 +66,26 @@ pub const ByteVectorType = struct {
 
         // chunks root
         try merkleize(sha256Hash, self.block_bytes, self.max_chunk_count, out);
+    }
+
+    pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
+        return SingleType.fromSsz(self, ssz);
+    }
+
+    pub fn fromJson(self: @This(), json: []const u8) FromHexError!ParsedResult {
+        return SingleType.fromJson(self, json);
+    }
+
+    pub fn clone(self: @This(), value: []const u8) SszError!ParsedResult {
+        return SingleType.clone(self, value);
+    }
+
+    pub fn equals(_: @This(), a: []const u8, b: []const u8) bool {
+        if (a.len != b.len) {
+            return false;
+        }
+
+        return std.mem.eql(u8, a, b);
     }
 
     // Serialization + deserialization
@@ -106,19 +127,6 @@ pub const ByteVectorType = struct {
         return result;
     }
 
-    /// public function
-    pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
-        return SingleType.fromSsz(self, ssz);
-    }
-
-    pub fn fromJson(self: @This(), json: []const u8) FromHexError!ParsedResult {
-        return SingleType.fromJson(self, json);
-    }
-
-    pub fn clone(self: @This(), value: []const u8) SszError!ParsedResult {
-        return SingleType.clone(self, value);
-    }
-
     /// Implementation for parent
     /// Consumer need to free the memory
     /// out parameter is unused because parent does not allocate, just to conform to the api
@@ -133,14 +141,6 @@ pub const ByteVectorType = struct {
         };
 
         return result;
-    }
-
-    pub fn equals(_: @This(), a: []const u8, b: []const u8) bool {
-        if (a.len != b.len) {
-            return false;
-        }
-
-        return std.mem.eql(u8, a, b);
     }
 
     pub fn doClone(self: @This(), arena_allocator: Allocator, value: []const u8, out: ?[]u8) ![]u8 {

@@ -66,6 +66,7 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
             self.allocator.free(self.block_bytes);
         }
 
+        /// public apis
         pub fn hashTreeRoot(self: *@This(), value: []const ZT, out: []u8) HashError!void {
             if (value.len != self.default_len) {
                 return error.InCorrectLen;
@@ -86,6 +87,18 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
 
             // merkleize the block_bytes
             try merkleize(sha256Hash, self.block_bytes, self.max_chunk_count, out);
+        }
+
+        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
+            return ArrayComposite.fromSsz(self, ssz);
+        }
+
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+            return ArrayComposite.fromJson(self, json);
+        }
+
+        pub fn clone(self: @This(), value: []const ZT) SszError!ParsedResult {
+            return ArrayComposite.clone(self, value);
         }
 
         // Serialization + deserialization
@@ -114,19 +127,6 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
         pub fn deserializeFromSlice(self: @This(), arena_allocator: Allocator, data: []const u8, _: ?[]ZT) SszError![]ZT {
             // TODO: validate length
             return try ArrayComposite.deserializeFromSlice(arena_allocator, self.element_type, data, null);
-        }
-
-        /// public api
-        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
-            return ArrayComposite.fromSsz(self, ssz);
-        }
-
-        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
-            return ArrayComposite.fromJson(self, json);
-        }
-
-        pub fn clone(self: @This(), value: []const ZT) SszError!ParsedResult {
-            return ArrayComposite.clone(self, value);
         }
 
         /// out parameter is not used because memory is always allocated inside the function

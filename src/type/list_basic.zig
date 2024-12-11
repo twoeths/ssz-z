@@ -54,6 +54,7 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
             self.allocator.free(self.mix_in_length_block_bytes);
         }
 
+        /// public apis
         pub fn hashTreeRoot(self: *@This(), value: []const ZT, out: []u8) HashError!void {
             if (out.len != 32) {
                 return error.InCorrectLen;
@@ -87,6 +88,18 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
             try merkleize(sha256Hash, self.mix_in_length_block_bytes, chunk_count, out);
         }
 
+        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
+            return ArrayBasic.fromSsz(self, ssz);
+        }
+
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+            return ArrayBasic.fromJson(self, json);
+        }
+
+        pub fn clone(self: @This(), value: []const ZT) SszError!ParsedResult {
+            return ArrayBasic.clone(self, value);
+        }
+
         // Serialization + deserialization
         pub fn serializedSize(self: @This(), value: []const ZT) usize {
             return self.element_type.byte_length * value.len;
@@ -98,19 +111,6 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
 
         pub fn deserializeFromBytes(self: @This(), data: []const u8, out: []ZT) !void {
             try ArrayBasic.deserializeFromBytes(self.element_type, data, out);
-        }
-
-        /// public api
-        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
-            return ArrayBasic.fromSsz(self, ssz);
-        }
-
-        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
-            return ArrayBasic.fromJson(self, json);
-        }
-
-        pub fn clone(self: @This(), value: []const ZT) SszError!ParsedResult {
-            return ArrayBasic.clone(self, value);
         }
 
         /// Same to deserializeFromBytes but this returns *T instead of out param

@@ -34,6 +34,8 @@ pub fn createUintType(comptime num_bytes: usize) type {
             // do nothing
         }
 
+        // public apis
+
         pub fn hashTreeRoot(_: @This(), value: *const T, out: []u8) HashError!void {
             if (out.len != 32) {
                 return error.InCorrectLen;
@@ -46,6 +48,10 @@ pub fn createUintType(comptime num_bytes: usize) type {
             const slice = std.mem.bytesAsSlice(T, out);
             const endian_value = if (native_endian == .big) @byteSwap(value.*) else value.*;
             slice[0] = endian_value;
+        }
+
+        pub fn equals(_: @This(), a: *const T, b: *const T) bool {
+            return a.* == b.*;
         }
 
         // Serialization + deserialization
@@ -115,10 +121,6 @@ pub fn createUintType(comptime num_bytes: usize) type {
             };
 
             return result;
-        }
-
-        pub fn equals(_: @This(), a: *const T, b: *const T) bool {
-            return a.* == b.*;
         }
 
         pub fn doClone(_: @This(), arena_allocator: Allocator, value: *const T, out: ?*T) !*T {

@@ -35,6 +35,18 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             }
         }
 
+        pub fn fromSsz(self: anytype, data: []const u8) SszError!ParsedResult {
+            return Array.fromSsz(self, data);
+        }
+
+        pub fn fromJson(self: anytype, json: []const u8) JsonError!ParsedResult {
+            return Array.fromJson(self, json);
+        }
+
+        pub fn clone(self: anytype, value: []const ZT) SszError!ParsedResult {
+            return Array.clone(self, value);
+        }
+
         pub fn serializedSize(element_type: *ST, value: []const ZT) usize {
             if (element_type.fixed_size == null) {
                 // variable length
@@ -119,18 +131,6 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             }
 
             return result;
-        }
-
-        pub fn fromSsz(self: anytype, data: []const u8) SszError!ParsedResult {
-            return Array.fromSsz(self, data);
-        }
-
-        pub fn fromJson(self: anytype, json: []const u8) JsonError!ParsedResult {
-            return Array.fromJson(self, json);
-        }
-
-        pub fn clone(self: anytype, value: []const ZT) SszError!ParsedResult {
-            return Array.clone(self, value);
         }
 
         /// same to deserializeFromSlice but this comes from a json string

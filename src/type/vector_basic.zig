@@ -58,6 +58,7 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
             self.allocator.free(self.block_bytes);
         }
 
+        /// public apis
         pub fn hashTreeRoot(self: *@This(), value: []const ZT, out: []u8) HashError!void {
             if (out.len != 32) {
                 return error.InCorrectLen;
@@ -75,6 +76,23 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
 
             // chunks root
             try merkleize(sha256Hash, self.block_bytes, self.max_chunk_count, out);
+        }
+
+        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
+            return ArrayBasic.fromSsz(self, ssz);
+        }
+
+        /// fromJson
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+            return ArrayBasic.fromJson(self, json);
+        }
+
+        pub fn clone(self: @This(), value: []const ZT) SszError!ParsedResult {
+            return ArrayBasic.clone(self, value);
+        }
+
+        pub fn equals(self: @This(), a: []const ZT, b: []const ZT) bool {
+            return ArrayBasic.itemEquals(self.element_type, a, b);
         }
 
         // Serialization + deserialization
@@ -105,29 +123,11 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
             return try ArrayBasic.deserializeFromSlice(arenaAllocator, self.element_type, slice, out);
         }
 
-        /// public api
-        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
-            return ArrayBasic.fromSsz(self, ssz);
-        }
-
-        /// fromJson
-        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
-            return ArrayBasic.fromJson(self, json);
-        }
-
-        pub fn clone(self: @This(), value: []const ZT) SszError!ParsedResult {
-            return ArrayBasic.clone(self, value);
-        }
-
         /// Implementation for parent
         /// Consumer need to free the memory
         /// out parameter is unused because parent does not allocate, just to conform to the api
         pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, out: ?[]ZT) JsonError![]ZT {
             return try ArrayBasic.deserializeFromJson(arena_allocator, self.element_type, source, self.length, out);
-        }
-
-        pub fn equals(self: @This(), a: []const ZT, b: []const ZT) bool {
-            return ArrayBasic.itemEquals(self.element_type, a, b);
         }
 
         pub fn doClone(self: @This(), arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {

@@ -15,6 +15,18 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
     const ParsedResult = Parsed([]ZT);
 
     const ArrayBasic = struct {
+        pub fn fromSsz(self: anytype, data: []const u8) SszError!ParsedResult {
+            return Array.fromSsz(self, data);
+        }
+
+        pub fn fromJson(self: anytype, json: []const u8) JsonError!ParsedResult {
+            return Array.fromJson(self, json);
+        }
+
+        pub fn clone(self: anytype, value: []const ZT) SszError!ParsedResult {
+            return Array.clone(self, value);
+        }
+
         pub fn serializeToBytes(element_type: *ST, value: []const ZT, out: []u8) !usize {
             const elem_byte_length = element_type.byte_length;
             const byte_len = elem_byte_length * value.len;
@@ -63,18 +75,6 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             }
 
             return result;
-        }
-
-        pub fn fromSsz(self: anytype, data: []const u8) SszError!ParsedResult {
-            return Array.fromSsz(self, data);
-        }
-
-        pub fn fromJson(self: anytype, json: []const u8) JsonError!ParsedResult {
-            return Array.fromJson(self, json);
-        }
-
-        pub fn clone(self: anytype, value: []const ZT) SszError!ParsedResult {
-            return Array.clone(self, value);
         }
 
         /// consumer need to free the memory
