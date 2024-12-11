@@ -114,7 +114,7 @@ pub const ByteVectorType = struct {
         return SingleType.fromJson(self, json);
     }
 
-    pub fn clone(self: @This(), value: []const u8) !ParsedResult {
+    pub fn clone(self: @This(), value: []const u8) SszError!ParsedResult {
         return SingleType.clone(self, value);
     }
 

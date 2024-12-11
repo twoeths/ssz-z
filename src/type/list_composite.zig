@@ -133,7 +133,7 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
             return ArrayComposite.fromJson(self, json);
         }
 
-        pub fn clone(self: @This(), value: []const ZT) !ParsedResult {
+        pub fn clone(self: @This(), value: []const ZT) SszError!ParsedResult {
             return ArrayComposite.clone(self, value);
         }
 

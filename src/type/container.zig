@@ -110,7 +110,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         }
 
         // public function for consumers
-        pub fn clone(self: @This(), value: *const ZT) !ParsedResult {
+        pub fn clone(self: @This(), value: *const ZT) SszError!ParsedResult {
             return SingleType.clone(self, value);
         }
 

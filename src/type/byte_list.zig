@@ -8,6 +8,7 @@ const initZeroHash = @import("hash").initZeroHash;
 const deinitZeroHash = @import("hash").deinitZeroHash;
 const toRootHex = @import("util").toRootHex;
 const fromHex = @import("util").fromHex;
+const SszError = @import("./common.zig").SszError;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 
@@ -123,7 +124,7 @@ pub fn createByteListType(comptime limit_bytes: usize) type {
             return std.mem.allEqual(u8, a, b);
         }
 
-        pub fn clone(_: @This(), value: []const u8, out: []u8) !void {
+        pub fn clone(_: @This(), value: []const u8, out: []u8) SszError!void {
             if (value.len > limit_bytes or value.len != out.len) {
                 return error.InCorrectLen;
             }

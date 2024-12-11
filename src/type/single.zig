@@ -60,7 +60,7 @@ pub fn withType(comptime ZT: type) type {
             };
         }
 
-        pub fn clone(self: anytype, value: CloneType) !ParsedResult {
+        pub fn clone(self: anytype, value: CloneType) SszError!ParsedResult {
             const arena = try self.allocator.create(ArenaAllocator);
             arena.* = ArenaAllocator.init(self.allocator);
             const allocator = arena.allocator();

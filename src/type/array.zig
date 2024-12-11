@@ -20,7 +20,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return SingleType.fromJson(self, json);
         }
 
-        pub fn clone(self: anytype, value: []const ZT) !ParsedResult {
+        pub fn clone(self: anytype, value: []const ZT) SszError!ParsedResult {
             return SingleType.clone(self, value);
         }
 

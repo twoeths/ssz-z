@@ -114,7 +114,7 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
             return ArrayBasic.fromJson(self, json);
         }
 
-        pub fn clone(self: @This(), value: []const ZT) !ParsedResult {
+        pub fn clone(self: @This(), value: []const ZT) SszError!ParsedResult {
             return ArrayBasic.clone(self, value);
         }
 
