@@ -38,6 +38,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         fixed_end: usize,
         variable_field_count: usize,
 
+        /// public function for consumers
         pub fn init(allocator: Allocator, ssz_fields: ST) !@This() {
             var min_size: usize = 0;
             var max_size: usize = 0;
@@ -96,6 +97,34 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
 
             const result = try merkleize(hashFn, self.blocks_bytes, max_chunk_count, out);
             return result;
+        }
+
+        /// TODO: straight forward error type
+        pub fn fromSsz(self: @This(), ssz: []const u8) !ParsedResult {
+            return SingleType.fromSsz(self, ssz);
+        }
+
+        /// public function for consumers
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+            return SingleType.fromJson(self, json);
+        }
+
+        // public function for consumers
+        pub fn clone(self: @This(), value: *const ZT) !ParsedResult {
+            return SingleType.clone(self, value);
+        }
+
+        pub fn equals(self: @This(), a: *const ZT, b: *const ZT) bool {
+            inline for (zig_fields_info) |field_info| {
+                const field_name = field_info.name;
+                const ssz_type = &@field(self.ssz_fields, field_name);
+                const a_field_ptr = if (@typeInfo(field_info.type) == .Pointer) @field(a, field_name) else &@field(a, field_name);
+                const b_field_ptr = if (@typeInfo(field_info.type) == .Pointer) @field(b, field_name) else &@field(b, field_name);
+                if (!ssz_type.equals(a_field_ptr, b_field_ptr)) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         // Serialization + deserialization
@@ -160,22 +189,6 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             }
         }
 
-        /// public function for consumers
-        /// TODO: straight forward error type
-        pub fn fromSsz(self: @This(), ssz: []const u8) !ParsedResult {
-            return SingleType.fromSsz(self, ssz);
-        }
-
-        /// public function for consumers
-        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
-            return SingleType.fromJson(self, json);
-        }
-
-        // public function for consumers
-        pub fn clone(self: @This(), value: *const ZT) !ParsedResult {
-            return SingleType.clone(self, value);
-        }
-
         /// for embedded struct, it's allocated by the parent struct
         /// for pointer or slice, it's allocated on its own
         pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, out: ?*ZT) !*ZT {
@@ -238,19 +251,6 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             }
 
             return out2;
-        }
-
-        pub fn equals(self: @This(), a: *const ZT, b: *const ZT) bool {
-            inline for (zig_fields_info) |field_info| {
-                const field_name = field_info.name;
-                const ssz_type = &@field(self.ssz_fields, field_name);
-                const a_field_ptr = if (@typeInfo(field_info.type) == .Pointer) @field(a, field_name) else &@field(a, field_name);
-                const b_field_ptr = if (@typeInfo(field_info.type) == .Pointer) @field(b, field_name) else &@field(b, field_name);
-                if (!ssz_type.equals(a_field_ptr, b_field_ptr)) {
-                    return false;
-                }
-            }
-            return true;
         }
 
         pub fn doClone(self: @This(), arena_allocator: Allocator, value: *const ZT, out: ?*ZT) !*ZT {
