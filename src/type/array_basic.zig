@@ -5,6 +5,7 @@ const ArrayList = std.ArrayList;
 const Token = std.json.Token;
 const array = @import("./array.zig").withElementTypes;
 const JsonError = @import("./common.zig").JsonError;
+const SszError = @import("./common.zig").SszError;
 const Parsed = @import("./type.zig").Parsed;
 
 /// ST: ssz element type
@@ -47,7 +48,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
         /// consumer need to free the memory
         /// out parameter is unused because it's always allocated inside the function
         /// TODO: consumer to validate the length, see deserializeFromJson
-        pub fn deserializeFromSlice(arenaAllocator: Allocator, element_type: *ST, data: []const u8, _: ?[]ZT) ![]ZT {
+        pub fn deserializeFromSlice(arenaAllocator: Allocator, element_type: *ST, data: []const u8, _: ?[]ZT) SszError![]ZT {
             const elem_byte_length = element_type.byte_length;
             if (data.len % elem_byte_length != 0) {
                 return error.InCorrectLen;
@@ -64,7 +65,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return result;
         }
 
-        pub fn fromSsz(self: anytype, data: []const u8) !ParsedResult {
+        pub fn fromSsz(self: anytype, data: []const u8) SszError!ParsedResult {
             return Array.fromSsz(self, data);
         }
 

@@ -5,6 +5,7 @@ const expect = std.testing.expect;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 const JsonError = @import("./common.zig").JsonError;
+const SszError = @import("./common.zig").SszError;
 
 pub fn createUintType(comptime num_bytes: usize) type {
     if (num_bytes != 2 and num_bytes != 4 and num_bytes != 8) {
@@ -76,7 +77,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
         /// Same to deserializeFromBytes but this returns *T instead of out param
         /// If this is called from ArrayBasic, out parameter is null so we have to allocate memory
         /// If this is called from a container, out parameter is not null, no need to allocate memory
-        pub fn deserializeFromSlice(_: @This(), allocator: Allocator, slice: []const u8, out: ?*T) !*T {
+        pub fn deserializeFromSlice(_: @This(), allocator: Allocator, slice: []const u8, out: ?*T) SszError!*T {
             if (slice.len < num_bytes) {
                 return error.InCorrectLen;
             }

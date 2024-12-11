@@ -7,6 +7,7 @@ const array = @import("./array.zig").withElementTypes;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 const JsonError = @import("./common.zig").JsonError;
+const SszError = @import("./common.zig").SszError;
 const Parsed = @import("./type.zig").Parsed;
 
 /// ST: ssz element type
@@ -95,7 +96,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             }
         }
 
-        pub fn deserializeFromSlice(arena_allocator: std.mem.Allocator, element_type: *ST, data: []const u8, _: ?[]ZT) ![]ZT {
+        pub fn deserializeFromSlice(arena_allocator: std.mem.Allocator, element_type: *ST, data: []const u8, _: ?[]ZT) SszError![]ZT {
             // TODO: consumers should check if the length is correct
             const offsets = try readOffsetsArrayComposite(arena_allocator, element_type, data);
             defer arena_allocator.free(offsets);
@@ -120,7 +121,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return result;
         }
 
-        pub fn fromSsz(self: anytype, data: []const u8) !ParsedResult {
+        pub fn fromSsz(self: anytype, data: []const u8) SszError!ParsedResult {
             return Array.fromSsz(self, data);
         }
 

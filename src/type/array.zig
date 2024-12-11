@@ -3,6 +3,7 @@ const ArenaAllocator = std.heap.ArenaAllocator;
 const Allocator = std.mem.Allocator;
 const Scanner = std.json.Scanner;
 const JsonError = @import("./common.zig").JsonError;
+const SszError = @import("./common.zig").SszError;
 const Parsed = @import("./type.zig").Parsed;
 
 /// ST: ssz element type
@@ -11,7 +12,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
     const ParsedResult = Parsed([]ZT);
     const SingleType = @import("./single.zig").withType([]ZT);
     const Array = struct {
-        pub fn fromSsz(self: anytype, ssz: []const u8) !ParsedResult {
+        pub fn fromSsz(self: anytype, ssz: []const u8) SszError!ParsedResult {
             return SingleType.fromSsz(self, ssz);
         }
 

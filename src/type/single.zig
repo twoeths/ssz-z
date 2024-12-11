@@ -1,8 +1,11 @@
 const std = @import("std");
 const ArenaAllocator = std.heap.ArenaAllocator;
+const Allocator = std.mem.Allocator;
+const AllocatorError = Allocator.Error;
 const Scanner = std.json.Scanner;
 const Parsed = @import("./type.zig").Parsed;
 const JsonError = @import("./common.zig").JsonError;
+const SszError = @import("./common.zig").SszError;
 
 pub fn withType(comptime ZT: type) type {
     const ParsedResult = Parsed(ZT);
@@ -17,7 +20,7 @@ pub fn withType(comptime ZT: type) type {
     };
 
     return struct {
-        pub fn fromSsz(self: anytype, ssz: []const u8) !ParsedResult {
+        pub fn fromSsz(self: anytype, ssz: []const u8) SszError!ParsedResult {
             const arena = try self.allocator.create(ArenaAllocator);
             arena.* = ArenaAllocator.init(self.allocator);
             const allocator = arena.allocator();

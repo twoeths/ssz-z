@@ -9,6 +9,7 @@ const fromHex = @import("util").fromHex;
 const FromHexError = @import("hash").FromHexError;
 const Parsed = @import("hash").Parsed;
 const ParsedResult = Parsed([]u8);
+const SszError = @import("./common.zig").SszError;
 const SingleType = @import("./single.zig").withType([]u8);
 
 pub const ByteVectorType = struct {
@@ -94,7 +95,7 @@ pub const ByteVectorType = struct {
     /// Same to deserializeFromBytes but this returns *T instead of out param
     /// Consumer need to free the memory
     /// out parameter is unused because parent does not allocate, just to conform to the api
-    pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, _: ?[]u8) ![]u8 {
+    pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, _: ?[]u8) SszError![]u8 {
         if (slice.len != self.fixed_size) {
             return error.InCorrectLen;
         }
@@ -105,7 +106,7 @@ pub const ByteVectorType = struct {
     }
 
     /// public function
-    pub fn fromSsz(self: @This(), ssz: []const u8) !ParsedResult {
+    pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
         return SingleType.fromSsz(self, ssz);
     }
 

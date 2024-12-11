@@ -9,6 +9,7 @@ const HashFn = @import("hash").HashFn;
 const sha256Hash = @import("hash").sha256Hash;
 const toRootHex = @import("util").toRootHex;
 const JsonError = @import("./common.zig").JsonError;
+const SszError = @import("./common.zig").SszError;
 const Parsed = @import("./type.zig").Parsed;
 
 const BytesRange = struct {
@@ -99,8 +100,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return result;
         }
 
-        /// TODO: straight forward error type
-        pub fn fromSsz(self: @This(), ssz: []const u8) !ParsedResult {
+        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
             return SingleType.fromSsz(self, ssz);
         }
 
@@ -191,7 +191,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
 
         /// for embedded struct, it's allocated by the parent struct
         /// for pointer or slice, it's allocated on its own
-        pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, out: ?*ZT) !*ZT {
+        pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, out: ?*ZT) SszError!*ZT {
             var out2 = if (out != null) out.? else try arenaAllocator.create(ZT);
 
             // TODO: validate data length

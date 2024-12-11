@@ -12,6 +12,7 @@ const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 const JsonError = @import("./common.zig").JsonError;
+const SszError = @import("./common.zig").SszError;
 const Parsed = @import("./type.zig").Parsed;
 
 /// List: ordered variable-length homogeneous collection, limited to N values
@@ -99,7 +100,7 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
         }
 
         /// public api
-        pub fn fromSsz(self: @This(), ssz: []const u8) !ParsedResult {
+        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
             return ArrayBasic.fromSsz(self, ssz);
         }
 
@@ -114,7 +115,7 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
         /// Same to deserializeFromBytes but this returns *T instead of out param
         /// Consumer need to free the memory
         /// out parameter is unused, just to conform to the api
-        pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, out: ?[]ZT) ![]ZT {
+        pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, out: ?[]ZT) SszError![]ZT {
             return try ArrayBasic.deserializeFromSlice(arenaAllocator, self.element_type, slice, out);
         }
 

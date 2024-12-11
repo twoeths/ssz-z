@@ -12,6 +12,7 @@ const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 const JsonError = @import("./common.zig").JsonError;
+const SszError = @import("./common.zig").SszError;
 const Parsed = @import("./type.zig").Parsed;
 
 /// Vector: Ordered fixed-length homogeneous collection, with N values
@@ -109,13 +110,13 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
             try ArrayComposite.deserializeFromBytes(self.allocator, self.element_type, data, out);
         }
 
-        pub fn deserializeFromSlice(self: @This(), arena_allocator: Allocator, data: []const u8, _: ?[]ZT) ![]ZT {
+        pub fn deserializeFromSlice(self: @This(), arena_allocator: Allocator, data: []const u8, _: ?[]ZT) SszError![]ZT {
             // TODO: validate length
             return try ArrayComposite.deserializeFromSlice(arena_allocator, self.element_type, data, null);
         }
 
         /// public api
-        pub fn fromSsz(self: @This(), ssz: []const u8) !ParsedResult {
+        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
             return ArrayComposite.fromSsz(self, ssz);
         }
 
