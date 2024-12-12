@@ -7,7 +7,8 @@ An implementation of Ethereum Consensus Spec SimpleSerialize https://github.com/
 ## Examples
 
 ## Commands:
-- `zig build test` to run all tests
+- `zig build test:unit` to run all unit tests
+- `zig build test:int` to run all integration tests (tests across types)
 - `zig test --dep util -Mroot=src/hash/merkleize.zig  -Mutil=lib/hex.zig` run tests in merkleize.zig
-- `zig test --dep hash -Mroot=src/type/container.zig -Mhash=src/hash/merkleize.zig` run tests in src/type/container.zig
-- `zig build test --verbose` to see how to map modules
+- `zig test --dep util --dep hash -Mroot=src/type/container.zig -Mutil=/Users/tuyennguyen/Projects/workshop/ssz-z/lib/hex.zig -Mhash=src/hash/merkleize.zig` to run tests in `src/type/container.zig`
+- `zig build test:unit --verbose` to see how to map modules
