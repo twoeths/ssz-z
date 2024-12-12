@@ -95,7 +95,7 @@ pub fn build(b: *std.Build) void {
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
     // Similar to the run step above, this creates a test step in test folder
-    const run_lib_unit_valid_tests = addValidTest(b, target, optimize, util_module, hash_module);
+    const run_lib_unit_valid_tests = addIntTest(b, target, optimize, util_module, hash_module);
 
     const exe_unit_tests = b.addTest(.{
         .root_source_file = b.path("src/main.zig"),
@@ -112,18 +112,20 @@ pub fn build(b: *std.Build) void {
     // the `zig build --help` menu, providing a way for the user to request
     // running the unit tests.
     // TODO: cannot display information in "zig build test" https://github.com/ziglang/zig/issues/16673
-    const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_lib_unit_tests.step);
-    test_step.dependOn(&run_exe_unit_tests.step);
-    test_step.dependOn(&run_lib_unit_valid_tests.step);
+    const unit_test_step = b.step("test:unit", "Run unit tests");
+    unit_test_step.dependOn(&run_lib_unit_tests.step);
+    unit_test_step.dependOn(&run_exe_unit_tests.step);
+
+    const int_test_step = b.step("test:int", "Run integration tests");
+    int_test_step.dependOn(&run_lib_unit_valid_tests.step);
 }
 
-fn addValidTest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, util_module: *std.Build.Module, hash_module: *std.Build.Module) *std.Build.Step.Run {
+fn addIntTest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, util_module: *std.Build.Module, hash_module: *std.Build.Module) *std.Build.Step.Run {
     // Similar to the run step above, this creates a test step in test folder
     const lib_unit_valid_tests = b.addTest(.{
-        .root_source_file = b.path("test/unit/root.zig"),
+        .root_source_file = b.path("test/int/root.zig"),
         // use this to run a specific test
-        // .root_source_file = b.path("test/unit/type/vector_composite.zig"),
+        // .root_source_file = b.path("test/int/type/vector_composite.zig"),
         .target = target,
         .optimize = optimize,
     });
