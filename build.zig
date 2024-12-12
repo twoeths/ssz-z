@@ -123,9 +123,9 @@ pub fn build(b: *std.Build) void {
 fn addIntTest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, util_module: *std.Build.Module, hash_module: *std.Build.Module) *std.Build.Step.Run {
     // Similar to the run step above, this creates a test step in test folder
     const lib_unit_valid_tests = b.addTest(.{
-        .root_source_file = b.path("test/unit/root.zig"),
+        .root_source_file = b.path("test/int/root.zig"),
         // use this to run a specific test
-        // .root_source_file = b.path("test/unit/type/vector_composite.zig"),
+        // .root_source_file = b.path("test/int/type/vector_composite.zig"),
         .target = target,
         .optimize = optimize,
     });
