@@ -36,6 +36,7 @@ pub fn withType(comptime ZT: type) type {
             };
         }
 
+        // TODO: self is unchanged so make it *const
         pub fn fromJson(self: anytype, json: []const u8) JsonError!ParsedResult {
             const arena = try self.allocator.create(ArenaAllocator);
             arena.* = ArenaAllocator.init(self.allocator);

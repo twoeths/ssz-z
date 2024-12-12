@@ -7,6 +7,7 @@ const native_endian = builtin.target.cpu.arch.endian();
 const JsonError = @import("./common.zig").JsonError;
 const SszError = @import("./common.zig").SszError;
 const HashError = @import("./common.zig").HashError;
+const Parsed = @import("./type.zig").Parsed;
 
 pub fn createUintType(comptime num_bytes: usize) type {
     if (num_bytes != 2 and num_bytes != 4 and num_bytes != 8) {
@@ -19,6 +20,8 @@ pub fn createUintType(comptime num_bytes: usize) type {
         8 => u64,
         else => unreachable,
     };
+    const SingleType = @import("./single.zig").withType(T);
+    const ParsedResult = Parsed(T);
 
     return struct {
         fixed_size: ?usize,
@@ -48,6 +51,18 @@ pub fn createUintType(comptime num_bytes: usize) type {
             const slice = std.mem.bytesAsSlice(T, out);
             const endian_value = if (native_endian == .big) @byteSwap(value.*) else value.*;
             slice[0] = endian_value;
+        }
+
+        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
+            return SingleType.fromSsz(self, ssz);
+        }
+
+        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+            return SingleType.fromJson(self, json);
+        }
+
+        pub fn clone(self: @This(), value: *const T) SszError!ParsedResult {
+            return SingleType.clone(self, value);
         }
 
         pub fn equals(_: @This(), a: *const T, b: *const T) bool {
@@ -84,29 +99,18 @@ pub fn createUintType(comptime num_bytes: usize) type {
         /// Same to deserializeFromBytes but this returns *T instead of out param
         /// If this is called from ArrayBasic, out parameter is null so we have to allocate memory
         /// If this is called from a container, out parameter is not null, no need to allocate memory
-        pub fn deserializeFromSlice(_: @This(), allocator: Allocator, slice: []const u8, out: ?*T) SszError!*T {
+        pub fn deserializeFromSlice(_: @This(), arena_allocator: Allocator, slice: []const u8, out: ?*T) SszError!*T {
             if (slice.len < num_bytes) {
                 return error.InCorrectLen;
             }
 
-            const result = if (out != null) out.? else try allocator.create(T);
+            const result = if (out != null) out.? else try arena_allocator.create(T);
             const sliceT = std.mem.bytesAsSlice(T, slice);
             const value = sliceT[0];
             const endian_value = if (native_endian == .big) @byteSwap(value) else value;
             result.* = endian_value;
             return result;
         }
-
-        /// public function
-        /// TODO: fromSsz()?
-        /// Json
-        pub fn fromJson(_: @This(), arena_allocator: Allocator, json: []const u8) JsonError!*T {
-            const result = try arena_allocator.create(T);
-            result.* = try sliceToInt(T, json);
-            return result;
-        }
-
-        // TODO: clone?
 
         /// an implementation for parent types
         pub fn deserializeFromJson(_: @This(), arena_allocator: Allocator, source: *Scanner, out: ?*T) JsonError!*T {
@@ -155,11 +159,10 @@ pub fn isNumberFormattedLikeAnInteger(value: []const u8) bool {
 test "createUintType" {
     const UintType = createUintType(8);
     const uintType = try UintType.init();
-    // defer uintType.deinit();
+    defer uintType.deinit();
     const value: u64 = 0xffffffffffffffff;
     var root = [_]u8{0} ** 32;
     try uintType.hashTreeRoot(&value, root[0..]);
-    // std.debug.print("uintType.hashTreeRoot(0xffffffffffffffff) {any}\n", .{root});
 
     // TODO: more unit tests: serialize + deserialize, clone, make sure can mutate output values
     // var out: [8]u8 = undefined;
@@ -173,21 +176,4 @@ test "createUintType" {
     // defer arena.deinit();
     // const valueFromJson = try uintType.fromJson(arena.allocator(), out[0..]);
     // try expect(valueFromJson.* == valueToJson);
-}
-
-// we can use below code for hashTreeRoot() implementation above
-test "pointer casting" {
-    const bytes align(@alignOf(u32)) = [_]u8{ 0x12, 0x12, 0x12, 0x12 };
-    const u32_ptr: *const u32 = @ptrCast(&bytes);
-    try expect(u32_ptr.* == 0x12121212);
-
-    // Even this example is contrived - there are better ways to do the above than
-    // pointer casting. For example, using a slice narrowing cast:
-    const u32_value = std.mem.bytesAsSlice(u32, bytes[0..])[0];
-    try expect(u32_value == 0x12121212);
-
-    // And even another way, the most straightforward way to do it:
-    try expect(@as(u32, @bitCast(bytes)) == 0x12121212);
-
-    return error.SkipZigTest;
 }
