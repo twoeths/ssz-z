@@ -69,15 +69,15 @@ pub const ByteVectorType = struct {
     }
 
     pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
-        return SingleType.fromSsz(self, ssz);
+        return SingleType.fromSsz(&self, ssz);
     }
 
     pub fn fromJson(self: @This(), json: []const u8) FromHexError!ParsedResult {
-        return SingleType.fromJson(self, json);
+        return SingleType.fromJson(&self, json);
     }
 
     pub fn clone(self: @This(), value: []const u8) SszError!ParsedResult {
-        return SingleType.clone(self, value);
+        return SingleType.clone(&self, value);
     }
 
     pub fn equals(_: @This(), a: []const u8, b: []const u8) bool {

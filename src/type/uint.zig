@@ -54,15 +54,15 @@ pub fn createUintType(comptime num_bytes: usize) type {
         }
 
         pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
-            return SingleType.fromSsz(self, ssz);
+            return SingleType.fromSsz(&self, ssz);
         }
 
         pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
-            return SingleType.fromJson(self, json);
+            return SingleType.fromJson(&self, json);
         }
 
         pub fn clone(self: @This(), value: *const T) SszError!ParsedResult {
-            return SingleType.clone(self, value);
+            return SingleType.clone(&self, value);
         }
 
         pub fn equals(_: @This(), a: *const T, b: *const T) bool {

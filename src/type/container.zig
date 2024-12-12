@@ -101,17 +101,17 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         }
 
         pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
-            return SingleType.fromSsz(self, ssz);
+            return SingleType.fromSsz(&self, ssz);
         }
 
         /// public function for consumers
         pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
-            return SingleType.fromJson(self, json);
+            return SingleType.fromJson(&self, json);
         }
 
         // public function for consumers
         pub fn clone(self: @This(), value: *const ZT) SszError!ParsedResult {
-            return SingleType.clone(self, value);
+            return SingleType.clone(&self, value);
         }
 
         pub fn equals(self: @This(), a: *const ZT, b: *const ZT) bool {
