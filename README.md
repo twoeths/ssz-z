@@ -18,3 +18,11 @@ Clone the repository and build the project using Zig `git clone https://github.c
 - `zig test --dep util -Mroot=src/hash/merkleize.zig  -Mutil=lib/hex.zig` run tests in merkleize.zig
 - `zig test --dep util --dep hash -Mroot=src/type/container.zig -Mutil=/Users/tuyennguyen/Projects/workshop/ssz-z/lib/hex.zig -Mhash=src/hash/merkleize.zig` to run tests in `src/type/container.zig`
 - `zig build test:unit --verbose` to see how to map modules
+
+## Tags
+
+- Zig
+- SSZ
+- Ethereum
+- Serialization
+- Consensus
