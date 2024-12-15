@@ -45,7 +45,7 @@ pub const ByteVectorType = struct {
         };
     }
 
-    pub fn deinit(self: @This()) void {
+    pub fn deinit(self: *const @This()) void {
         self.allocator.free(self.block_bytes);
     }
 
@@ -68,16 +68,16 @@ pub const ByteVectorType = struct {
         try merkleize(sha256Hash, self.block_bytes, self.max_chunk_count, out);
     }
 
-    pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
-        return SingleType.fromSsz(&self, ssz);
+    pub fn fromSsz(self: *const @This(), ssz: []const u8) SszError!ParsedResult {
+        return SingleType.fromSsz(self, ssz);
     }
 
-    pub fn fromJson(self: @This(), json: []const u8) FromHexError!ParsedResult {
-        return SingleType.fromJson(&self, json);
+    pub fn fromJson(self: *const @This(), json: []const u8) FromHexError!ParsedResult {
+        return SingleType.fromJson(self, json);
     }
 
-    pub fn clone(self: @This(), value: []const u8) SszError!ParsedResult {
-        return SingleType.clone(&self, value);
+    pub fn clone(self: *const @This(), value: []const u8) SszError!ParsedResult {
+        return SingleType.clone(self, value);
     }
 
     pub fn equals(_: @This(), a: []const u8, b: []const u8) bool {
@@ -89,11 +89,11 @@ pub const ByteVectorType = struct {
     }
 
     // Serialization + deserialization
-    pub fn serializedSize(self: @This(), _: []const u8) usize {
+    pub fn serializedSize(self: *const @This(), _: []const u8) usize {
         return self.fixed_size.?;
     }
 
-    pub fn serializeToBytes(self: @This(), value: []const u8, out: []u8) !usize {
+    pub fn serializeToBytes(self: *const @This(), value: []const u8, out: []u8) !usize {
         if (out.len != self.fixed_size) {
             return error.InCorrectLen;
         }
@@ -102,7 +102,7 @@ pub const ByteVectorType = struct {
         return self.fixed_size.?;
     }
 
-    pub fn deserializeFromBytes(self: @This(), data: []const u8, out: []u8) !void {
+    pub fn deserializeFromBytes(self: *const @This(), data: []const u8, out: []u8) !void {
         if (data.len != self.fixed_size) {
             return error.InCorrectLen;
         }
@@ -117,7 +117,7 @@ pub const ByteVectorType = struct {
     /// Same to deserializeFromBytes but this returns *T instead of out param
     /// Consumer need to free the memory
     /// out parameter is unused because parent does not allocate, just to conform to the api
-    pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, _: ?[]u8) SszError![]u8 {
+    pub fn deserializeFromSlice(self: *const @This(), arenaAllocator: Allocator, slice: []const u8, _: ?[]u8) SszError![]u8 {
         if (slice.len != self.fixed_size) {
             return error.InCorrectLen;
         }
@@ -130,7 +130,7 @@ pub const ByteVectorType = struct {
     /// Implementation for parent
     /// Consumer need to free the memory
     /// out parameter is unused because parent does not allocate, just to conform to the api
-    pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, _: ?[]u8) ![]u8 {
+    pub fn deserializeFromJson(self: *const @This(), arena_allocator: Allocator, source: *Scanner, _: ?[]u8) ![]u8 {
         const value = try source.next();
         const result = try arena_allocator.alloc(u8, self.fixed_size.?);
         try switch (value) {
@@ -143,7 +143,7 @@ pub const ByteVectorType = struct {
         return result;
     }
 
-    pub fn doClone(self: @This(), arena_allocator: Allocator, value: []const u8, out: ?[]u8) ![]u8 {
+    pub fn doClone(self: *const @This(), arena_allocator: Allocator, value: []const u8, out: ?[]u8) ![]u8 {
         const out2 = if (out != null) out.? else try arena_allocator.alloc(u8, self.fixed_size.?);
         @memcpy(out2, value);
         return out2;

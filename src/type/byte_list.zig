@@ -32,7 +32,7 @@ pub fn createByteListType(comptime limit_bytes: usize) type {
             return @This(){ .allocator = allocator, .block_bytes = try BlockBytes.initCapacity(allocator, init_capacity), .mix_in_length_block_bytes = try allocator.alloc(u8, 64) };
         }
 
-        pub fn deinit(self: @This()) void {
+        pub fn deinit(self: *const @This()) void {
             self.block_bytes.deinit();
             self.allocator.free(self.mix_in_length_block_bytes);
         }

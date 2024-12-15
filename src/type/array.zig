@@ -13,15 +13,15 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
     const SingleType = @import("./single.zig").withType([]ZT);
     const Array = struct {
         pub fn fromSsz(self: anytype, ssz: []const u8) SszError!ParsedResult {
-            return SingleType.fromSsz(&self, ssz);
+            return SingleType.fromSsz(self, ssz);
         }
 
         pub fn fromJson(self: anytype, json: []const u8) JsonError!ParsedResult {
-            return SingleType.fromJson(&self, json);
+            return SingleType.fromJson(self, json);
         }
 
         pub fn clone(self: anytype, value: []const ZT) SszError!ParsedResult {
-            return SingleType.clone(&self, value);
+            return SingleType.clone(self, value);
         }
 
         pub fn itemEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {
