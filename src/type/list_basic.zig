@@ -49,7 +49,7 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
             return @This(){ .allocator = allocator, .element_type = element_type, .limit = limit, .fixed_size = null, .depth = depth, .chunk_depth = chunk_depth, .max_chunk_count = max_chunk_count, .min_size = 0, .max_size = limit * element_type.max_size, .block_bytes = try BlockBytes.initCapacity(allocator, init_capacity_bytes), .mix_in_length_block_bytes = try allocator.alloc(u8, 64) };
         }
 
-        pub fn deinit(self: @This()) void {
+        pub fn deinit(self: *const @This()) void {
             self.block_bytes.deinit();
             self.allocator.free(self.mix_in_length_block_bytes);
         }
@@ -88,50 +88,50 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
             try merkleize(sha256Hash, self.mix_in_length_block_bytes, chunk_count, out);
         }
 
-        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
+        pub fn fromSsz(self: *const @This(), ssz: []const u8) SszError!ParsedResult {
             return ArrayBasic.fromSsz(self, ssz);
         }
 
-        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+        pub fn fromJson(self: *const @This(), json: []const u8) JsonError!ParsedResult {
             return ArrayBasic.fromJson(self, json);
         }
 
-        pub fn clone(self: @This(), value: []const ZT) SszError!ParsedResult {
+        pub fn clone(self: *const @This(), value: []const ZT) SszError!ParsedResult {
             return ArrayBasic.clone(self, value);
         }
 
         // Serialization + deserialization
-        pub fn serializedSize(self: @This(), value: []const ZT) usize {
+        pub fn serializedSize(self: *const @This(), value: []const ZT) usize {
             return self.element_type.byte_length * value.len;
         }
 
-        pub fn serializeToBytes(self: @This(), value: []const ZT, out: []u8) !usize {
+        pub fn serializeToBytes(self: *const @This(), value: []const ZT, out: []u8) !usize {
             return try ArrayBasic.serializeToBytes(self.element_type, value, out);
         }
 
-        pub fn deserializeFromBytes(self: @This(), data: []const u8, out: []ZT) !void {
+        pub fn deserializeFromBytes(self: *const @This(), data: []const u8, out: []ZT) !void {
             try ArrayBasic.deserializeFromBytes(self.element_type, data, out);
         }
 
         /// Same to deserializeFromBytes but this returns *T instead of out param
         /// Consumer need to free the memory
         /// out parameter is unused, just to conform to the api
-        pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, out: ?[]ZT) SszError![]ZT {
+        pub fn deserializeFromSlice(self: *const @This(), arenaAllocator: Allocator, slice: []const u8, out: ?[]ZT) SszError![]ZT {
             return try ArrayBasic.deserializeFromSlice(arenaAllocator, self.element_type, slice, out);
         }
 
         /// Implementation for parent
         /// Consumer need to free the memory
         /// out parameter is unused because parent does not allocate, just to conform to the api
-        pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, out: ?[]ZT) JsonError![]ZT {
+        pub fn deserializeFromJson(self: *const @This(), arena_allocator: Allocator, source: *Scanner, out: ?[]ZT) JsonError![]ZT {
             return try ArrayBasic.deserializeFromJson(arena_allocator, self.element_type, source, null, out);
         }
 
-        pub fn equals(self: @This(), a: []const ZT, b: []const ZT) bool {
+        pub fn equals(self: *const @This(), a: []const ZT, b: []const ZT) bool {
             return ArrayBasic.itemEquals(self.element_type, a, b);
         }
 
-        pub fn doClone(self: @This(), arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+        pub fn doClone(self: *const @This(), arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
             return try ArrayBasic.itemClone(self.element_type, arena_allocator, value, out);
         }
     };

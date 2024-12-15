@@ -62,7 +62,7 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
             };
         }
 
-        pub fn deinit(self: @This()) void {
+        pub fn deinit(self: *const @This()) void {
             self.block_bytes.deinit();
             self.allocator.free(self.mix_in_length_block_bytes);
         }
@@ -103,24 +103,24 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
             try merkleize(sha256Hash, self.mix_in_length_block_bytes, chunk_count, out);
         }
 
-        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
+        pub fn fromSsz(self: *const @This(), ssz: []const u8) SszError!ParsedResult {
             return ArrayComposite.fromSsz(self, ssz);
         }
 
-        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+        pub fn fromJson(self: *const @This(), json: []const u8) JsonError!ParsedResult {
             return ArrayComposite.fromJson(self, json);
         }
 
-        pub fn clone(self: @This(), value: []const ZT) SszError!ParsedResult {
+        pub fn clone(self: *const @This(), value: []const ZT) SszError!ParsedResult {
             return ArrayComposite.clone(self, value);
         }
 
         // Serialization + deserialization
-        pub fn serializedSize(self: @This(), value: []const ZT) usize {
+        pub fn serializedSize(self: *const @This(), value: []const ZT) usize {
             return ArrayComposite.serializedSize(self.element_type, value);
         }
 
-        pub fn serializeToBytes(self: @This(), value: []const ZT, out: []u8) !usize {
+        pub fn serializeToBytes(self: *const @This(), value: []const ZT, out: []u8) !usize {
             // TODO: do we need this validation?
             const size = self.serializedSize(value);
             if (out.len != size) {
@@ -130,24 +130,24 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
             return try ArrayComposite.serializeToBytes(self.element_type, value, out);
         }
 
-        pub fn deserializeFromBytes(self: @This(), data: []const u8, out: []ZT) !void {
+        pub fn deserializeFromBytes(self: *const @This(), data: []const u8, out: []ZT) !void {
             try ArrayComposite.deserializeFromBytes(self.allocator, self.element_type, data, out);
         }
 
-        pub fn deserializeFromSlice(self: @This(), arena_allocator: Allocator, data: []const u8, _: ?[]ZT) SszError![]ZT {
+        pub fn deserializeFromSlice(self: *const @This(), arena_allocator: Allocator, data: []const u8, _: ?[]ZT) SszError![]ZT {
             return try ArrayComposite.deserializeFromSlice(arena_allocator, self.element_type, data, null);
         }
 
         /// out parameter is not used because memory is always allocated inside the function
-        pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, _: ?[]ZT) JsonError![]ZT {
+        pub fn deserializeFromJson(self: *const @This(), arena_allocator: Allocator, source: *Scanner, _: ?[]ZT) JsonError![]ZT {
             return try ArrayComposite.deserializeFromJson(arena_allocator, self.element_type, source, null, null);
         }
 
-        pub fn equals(self: @This(), a: []const ZT, b: []const ZT) bool {
+        pub fn equals(self: *const @This(), a: []const ZT, b: []const ZT) bool {
             return ArrayComposite.itemEquals(self.element_type, a, b);
         }
 
-        pub fn doClone(self: @This(), arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+        pub fn doClone(self: *const @This(), arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
             return try ArrayComposite.itemClone(self.element_type, arena_allocator, value, out);
         }
     };

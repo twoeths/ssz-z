@@ -53,15 +53,15 @@ pub fn createUintType(comptime num_bytes: usize) type {
             slice[0] = endian_value;
         }
 
-        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
+        pub fn fromSsz(self: *const @This(), ssz: []const u8) SszError!ParsedResult {
             return SingleType.fromSsz(self, ssz);
         }
 
-        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+        pub fn fromJson(self: *const @This(), json: []const u8) JsonError!ParsedResult {
             return SingleType.fromJson(self, json);
         }
 
-        pub fn clone(self: @This(), value: *const T) SszError!ParsedResult {
+        pub fn clone(self: *const @This(), value: *const T) SszError!ParsedResult {
             return SingleType.clone(self, value);
         }
 

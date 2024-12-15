@@ -10,7 +10,7 @@ pub fn Parsed(comptime T: type) type {
         // do not want to use pointer to pointer
         value: if (type_info == .Pointer) T else *T,
 
-        pub fn deinit(self: @This()) void {
+        pub fn deinit(self: *const @This()) void {
             const allocator = self.arena.child_allocator;
             self.arena.deinit();
             allocator.destroy(self.arena);

@@ -78,7 +78,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             };
         }
 
-        pub fn deinit(self: @This()) void {
+        pub fn deinit(self: *const @This()) void {
             self.allocator.free(self.blocks_bytes);
         }
 
@@ -100,21 +100,21 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return result;
         }
 
-        pub fn fromSsz(self: @This(), ssz: []const u8) SszError!ParsedResult {
+        pub fn fromSsz(self: *const @This(), ssz: []const u8) SszError!ParsedResult {
             return SingleType.fromSsz(self, ssz);
         }
 
         /// public function for consumers
-        pub fn fromJson(self: @This(), json: []const u8) JsonError!ParsedResult {
+        pub fn fromJson(self: *const @This(), json: []const u8) JsonError!ParsedResult {
             return SingleType.fromJson(self, json);
         }
 
         // public function for consumers
-        pub fn clone(self: @This(), value: *const ZT) SszError!ParsedResult {
+        pub fn clone(self: *const @This(), value: *const ZT) SszError!ParsedResult {
             return SingleType.clone(self, value);
         }
 
-        pub fn equals(self: @This(), a: *const ZT, b: *const ZT) bool {
+        pub fn equals(self: *const @This(), a: *const ZT, b: *const ZT) bool {
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const ssz_type = &@field(self.ssz_fields, field_name);
@@ -134,7 +134,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         // Fixed part                         Variable part
         // [field1 offset][field2 data       ][field1 data               ]
         // [0x000000c]    [0xaabbaabbaabbaabb][0xffffffffffffffffffffffff]
-        pub fn serializedSize(self: @This(), value: *const ZT) usize {
+        pub fn serializedSize(self: *const @This(), value: *const ZT) usize {
             var size: usize = 0;
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
@@ -150,7 +150,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return size;
         }
 
-        pub fn serializeToBytes(self: @This(), value: *const ZT, out: []u8) !usize {
+        pub fn serializeToBytes(self: *const @This(), value: *const ZT, out: []u8) !usize {
             var fixed_index: usize = 0;
             var variable_index = self.fixed_end;
 
@@ -174,7 +174,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         }
 
         // TODO: not sure if we need this or not as there is no way to know the size of internal slice size
-        pub fn deserializeFromBytes(self: @This(), data: []const u8, out: *ZT) !void {
+        pub fn deserializeFromBytes(self: *const @This(), data: []const u8, out: *ZT) !void {
             // TODO: validate data length
             // max_chunk_count is known at compile time so we can allocate on stack
             var field_ranges = [_]BytesRange{.{ .start = 0, .end = 0 }} ** max_chunk_count;
@@ -191,7 +191,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
 
         /// for embedded struct, it's allocated by the parent struct
         /// for pointer or slice, it's allocated on its own
-        pub fn deserializeFromSlice(self: @This(), arenaAllocator: Allocator, slice: []const u8, out: ?*ZT) SszError!*ZT {
+        pub fn deserializeFromSlice(self: *const @This(), arenaAllocator: Allocator, slice: []const u8, out: ?*ZT) SszError!*ZT {
             var out2 = if (out != null) out.? else try arenaAllocator.create(ZT);
 
             // TODO: validate data length
@@ -215,7 +215,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         }
 
         /// a recursive implementation for parent types or fromJson
-        pub fn deserializeFromJson(self: @This(), arena_allocator: Allocator, source: *Scanner, out: ?*ZT) JsonError!*ZT {
+        pub fn deserializeFromJson(self: *const @This(), arena_allocator: Allocator, source: *Scanner, out: ?*ZT) JsonError!*ZT {
             var out2 = if (out != null) out.? else try arena_allocator.create(ZT);
             // validate begin token "{"
             const begin_object_token = try source.next();
@@ -253,7 +253,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return out2;
         }
 
-        pub fn doClone(self: @This(), arena_allocator: Allocator, value: *const ZT, out: ?*ZT) !*ZT {
+        pub fn doClone(self: *const @This(), arena_allocator: Allocator, value: *const ZT, out: ?*ZT) !*ZT {
             var out2 = if (out != null) out.? else try arena_allocator.create(ZT);
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
@@ -274,7 +274,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         // Fields may not be contiguous in the serialized bytes, so the returned ranges are [start, end].
         // - For fixed size fields re-uses the pre-computed values this.fieldRangesFixedLen
         // - For variable size fields does a first pass over the fixed section to read offsets
-        fn getFieldRanges(self: @This(), data: []const u8, out: []BytesRange) !void {
+        fn getFieldRanges(self: *const @This(), data: []const u8, out: []BytesRange) !void {
             if (out.len != max_chunk_count) {
                 return error.InCorrectLen;
             }
@@ -302,7 +302,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         }
 
         // Returns the byte ranges of all variable size fields.
-        fn readVariableOffsets(self: @This(), data: []const u8, offsets: []u32) void {
+        fn readVariableOffsets(self: *const @This(), data: []const u8, offsets: []u32) void {
             var variable_index: usize = 0;
             var fixed_index: usize = 0;
             inline for (zig_fields_info) |field_info| {
