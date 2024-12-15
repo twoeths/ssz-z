@@ -126,7 +126,7 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
 
         pub fn deserializeFromSlice(self: *const @This(), arena_allocator: Allocator, data: []const u8, _: ?[]ZT) SszError![]ZT {
             // TODO: validate length
-            return try ArrayComposite.deserializeFromSlice(arena_allocator, self.element_type, data, null);
+            return try ArrayComposite.deserializeFromSlice(arena_allocator, self.element_type, data, self.default_len, null);
         }
 
         /// out parameter is not used because memory is always allocated inside the function

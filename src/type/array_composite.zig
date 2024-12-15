@@ -108,11 +108,14 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             }
         }
 
-        pub fn deserializeFromSlice(arena_allocator: std.mem.Allocator, element_type: *ST, data: []const u8, _: ?[]ZT) SszError![]ZT {
-            // TODO: consumers should check if the length is correct
+        pub fn deserializeFromSlice(arena_allocator: std.mem.Allocator, element_type: *ST, data: []const u8, expected_len: ?usize, _: ?[]ZT) SszError![]ZT {
             const offsets = try readOffsetsArrayComposite(arena_allocator, element_type, data);
             defer arena_allocator.free(offsets);
             const length = offsets.len;
+            if (expected_len != null and length != expected_len.?) {
+                return error.InCorrectLen;
+            }
+
             const result = try arena_allocator.alloc(ZT, length);
 
             for (result, 0..) |*elem, i| {
