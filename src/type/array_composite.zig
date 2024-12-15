@@ -122,7 +122,6 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
                 const elem_data = if (i == result.len - 1) data[offsets[i]..] else data[offsets[i]..offsets[i + 1]];
 
                 // ZT could be a slice, in that case we should pass elem itself instead of pointer to pointer
-                // TODO: unit test to confirm the below 2 cases
 
                 if (comptime @typeInfo(ZT) == .Pointer) {
                     // for pointer, no need to pass in elem_ptr but assignment is needed, we only copy pointer address
@@ -179,7 +178,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return arraylist.toOwnedSlice();
         }
 
-        pub fn itemEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {
+        pub fn itemEquals(element_type: *const ST, a: []const ZT, b: []const ZT) bool {
             return Array.itemEquals(element_type, a, b);
         }
 
