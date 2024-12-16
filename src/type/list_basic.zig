@@ -117,7 +117,7 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
         /// Consumer need to free the memory
         /// out parameter is unused, just to conform to the api
         pub fn deserializeFromSlice(self: *const @This(), arenaAllocator: Allocator, slice: []const u8, out: ?[]ZT) SszError![]ZT {
-            return try ArrayBasic.deserializeFromSlice(arenaAllocator, self.element_type, slice, out);
+            return try ArrayBasic.deserializeFromSlice(arenaAllocator, self.element_type, slice, null, out);
         }
 
         /// Implementation for parent

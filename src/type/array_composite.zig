@@ -108,18 +108,20 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             }
         }
 
-        pub fn deserializeFromSlice(arena_allocator: std.mem.Allocator, element_type: *ST, data: []const u8, _: ?[]ZT) SszError![]ZT {
-            // TODO: consumers should check if the length is correct
+        pub fn deserializeFromSlice(arena_allocator: std.mem.Allocator, element_type: *ST, data: []const u8, expected_len: ?usize, _: ?[]ZT) SszError![]ZT {
             const offsets = try readOffsetsArrayComposite(arena_allocator, element_type, data);
             defer arena_allocator.free(offsets);
             const length = offsets.len;
+            if (expected_len != null and length != expected_len.?) {
+                return error.InCorrectLen;
+            }
+
             const result = try arena_allocator.alloc(ZT, length);
 
             for (result, 0..) |*elem, i| {
                 const elem_data = if (i == result.len - 1) data[offsets[i]..] else data[offsets[i]..offsets[i + 1]];
 
                 // ZT could be a slice, in that case we should pass elem itself instead of pointer to pointer
-                // TODO: unit test to confirm the below 2 cases
 
                 if (comptime @typeInfo(ZT) == .Pointer) {
                     // for pointer, no need to pass in elem_ptr but assignment is needed, we only copy pointer address
@@ -176,7 +178,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return arraylist.toOwnedSlice();
         }
 
-        pub fn itemEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {
+        pub fn itemEquals(element_type: *const ST, a: []const ZT, b: []const ZT) bool {
             return Array.itemEquals(element_type, a, b);
         }
 

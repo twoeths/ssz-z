@@ -30,9 +30,8 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
         pub fn serializeToBytes(element_type: *ST, value: []const ZT, out: []u8) !usize {
             const elem_byte_length = element_type.byte_length;
             const byte_len = elem_byte_length * value.len;
-            if (byte_len != out.len) {
-                return error.InCorrectLen;
-            }
+
+            // out.len is not necessarily the same to byte_len
 
             for (value, 0..) |*elem, i| {
                 _ = try element_type.serializeToBytes(elem, out[i * elem_byte_length .. (i + 1) * elem_byte_length]);
@@ -59,14 +58,17 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
 
         /// consumer need to free the memory
         /// out parameter is unused because it's always allocated inside the function
-        /// TODO: consumer to validate the length, see deserializeFromJson
-        pub fn deserializeFromSlice(arenaAllocator: Allocator, element_type: *ST, data: []const u8, _: ?[]ZT) SszError![]ZT {
+        pub fn deserializeFromSlice(arenaAllocator: Allocator, element_type: *ST, data: []const u8, expected_len: ?usize, _: ?[]ZT) SszError![]ZT {
             const elem_byte_length = element_type.byte_length;
             if (data.len % elem_byte_length != 0) {
                 return error.InCorrectLen;
             }
 
             const elem_count = data.len / elem_byte_length;
+            if (expected_len != null and elem_count != expected_len.?) {
+                return error.InCorrectLen;
+            }
+
             const result = try arenaAllocator.alloc(ZT, elem_count);
             for (result, 0..) |*elem, i| {
                 // TODO: how to avoid the copy? or we can use ArrayList used in deserializeFromJson

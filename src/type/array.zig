@@ -24,15 +24,17 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return SingleType.clone(self, value);
         }
 
-        pub fn itemEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {
+        pub fn itemEquals(element_type: *const ST, a: []const ZT, b: []const ZT) bool {
             if (a.len != b.len) {
                 return false;
             }
 
+            const item_is_ptr = @typeInfo(ZT) == .Pointer;
+
             for (a, b) |*a_elem, *b_elem| {
                 // ZT could be a slice, in that case we should pass elem itself instead of pointer to pointer
-                const a_elem_ptr = if (@typeInfo(@TypeOf(a_elem.*)) == .Pointer) a_elem.* else a_elem;
-                const b_elem_ptr = if (@typeInfo(@TypeOf(b_elem.*)) == .Pointer) b_elem.* else b_elem;
+                const a_elem_ptr = if (item_is_ptr) a_elem.* else a_elem;
+                const b_elem_ptr = if (item_is_ptr) b_elem.* else b_elem;
                 if (!element_type.equals(a_elem_ptr, b_elem_ptr)) {
                     return false;
                 }
@@ -47,8 +49,10 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
                 return error.InCorrectLen;
             }
 
+            const item_is_ptr = @typeInfo(ZT) == .Pointer;
+
             for (value, out2, 0..) |*elem, *out_elem, i| {
-                if (@typeInfo(ZT) == .Pointer) {
+                if (item_is_ptr) {
                     // ZT could be a slice, in that case we should pass elem itself instead of pointer to pointer
                     const elem_ptr = elem.*;
                     out2[i] = try element_type.doClone(arena_allocator, elem_ptr, null);
