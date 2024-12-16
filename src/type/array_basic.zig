@@ -30,9 +30,8 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
         pub fn serializeToBytes(element_type: *ST, value: []const ZT, out: []u8) !usize {
             const elem_byte_length = element_type.byte_length;
             const byte_len = elem_byte_length * value.len;
-            if (byte_len != out.len) {
-                return error.InCorrectLen;
-            }
+
+            // out.len is not necessarily the same to byte_len
 
             for (value, 0..) |*elem, i| {
                 _ = try element_type.serializeToBytes(elem, out[i * elem_byte_length .. (i + 1) * elem_byte_length]);
