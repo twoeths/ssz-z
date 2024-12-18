@@ -71,12 +71,13 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
                 const out_slice = std.mem.bytesAsSlice(u32, out);
                 for (value, 0..) |*elem, i| {
                     // write offset
-                    // TODO: typescript always need offset here, confirm if Zig needs this or not thru unit test
+                    // Typescript needs offset but since Zig use slice, we don't need it
                     out_slice[i] = if (native_endian == .big) @byteSwap(variable_index) else variable_index;
 
                     // write serialized element to variable section
+                    // return number of bytes written
                     const elem_ptr = if (comptime @typeInfo(ZT) == .Pointer) elem.* else elem;
-                    variable_index = @intCast(try element_type.serializeToBytes(elem_ptr, out[variable_index..]));
+                    variable_index += @intCast(try element_type.serializeToBytes(elem_ptr, out[variable_index..]));
                 }
 
                 return variable_index;
@@ -244,7 +245,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
                     return error.offsetOutOfRange;
                 }
                 const prev_offset = offsets[i - 1];
-                if (off <= prev_offset) {
+                if (off < prev_offset) {
                     return error.offsetNotIncreasing;
                 }
                 offset.* = off;
