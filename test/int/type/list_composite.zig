@@ -93,11 +93,6 @@ test "ListCompositeType - element type Container" {
 }
 
 test "ListCompositeType - element type ListBasicType" {
-    // TODO: fix serialization bug
-    if (true) {
-        return error.SkipZigTest;
-    }
-
     const test_cases = [_]TestCase{
         TestCase{ .id = "empty", .serializedHex = "0x", .json = "[]", .rootHex = "0x7a0501f5957bdf9cb3a8ff4966f02265f968658b7a9c62642cba1165e86642f5" },
         TestCase{ .id = "2 full values", .serializedHex = "0x080000000c0000000100020003000400", .json = 

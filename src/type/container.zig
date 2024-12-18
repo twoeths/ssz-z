@@ -150,6 +150,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             return size;
         }
 
+        /// Serialize the object to bytes, return the number of bytes written
         pub fn serializeToBytes(self: *const @This(), value: *const ZT, out: []u8) !usize {
             var fixed_index: usize = 0;
             var variable_index = self.fixed_end;
@@ -164,9 +165,11 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                     const variable_index_endian = if (native_endian == .big) @byteSwap(variable_index) else variable_index;
                     slice[0] = @intCast(variable_index_endian);
                     fixed_index += 4;
-                    variable_index = try ssz_type.serializeToBytes(field_value_ptr, out[variable_index..]);
+                    // write serialized element to variable section
+                    // ssz_type.serializeToBytes returns number of bytes written
+                    variable_index += try ssz_type.serializeToBytes(field_value_ptr, out[variable_index..]);
                 } else {
-                    fixed_index = try ssz_type.serializeToBytes(field_value_ptr, out[fixed_index..]);
+                    fixed_index += try ssz_type.serializeToBytes(field_value_ptr, out[fixed_index..]);
                 }
             }
 
