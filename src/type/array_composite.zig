@@ -209,6 +209,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
         /// Reads the values of contiguous variable offsets
         /// This function also validates that all offsets are in range.
         /// consumer should free the returned offsets
+        /// TODO: avoid heap allocation
         fn readVariableOffsetsArrayComposite(allocator: std.mem.Allocator, data: []const u8) ![]usize {
             if (data.len == 0) {
                 const no_offset = try allocator.alloc(usize, 0);
