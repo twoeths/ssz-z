@@ -40,6 +40,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         variable_field_count: usize,
 
         /// public function for consumers
+        /// TODO: consider returning *@This(), see BitArray
         pub fn init(allocator: Allocator, ssz_fields: ST) !@This() {
             var min_size: usize = 0;
             var max_size: usize = 0;

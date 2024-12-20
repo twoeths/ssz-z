@@ -27,9 +27,9 @@ test "valid test for VectorBasicType" {
     const UintType = createUintType(8);
     const VectorBasicType = createVectorBasicType(UintType, u64);
     var uintType = try UintType.init();
-    var listType = try VectorBasicType.init(allocator, &uintType, 8);
+    var vectorType = try VectorBasicType.init(allocator, &uintType, 8);
     defer uintType.deinit();
-    defer listType.deinit();
+    defer vectorType.deinit();
 
     const TypeTest = @import("common.zig").typeTest(VectorBasicType);
 
@@ -37,6 +37,6 @@ test "valid test for VectorBasicType" {
         // TODO: find other way not to write to stderror
         // may have to use `zig build test 2>&1` on CI?
         std.debug.print("VectorBasicType test case {s}\n", .{tc.id});
-        try TypeTest.validSszTest(&listType, tc);
+        try TypeTest.validSszTest(&vectorType, tc);
     }
 }
