@@ -10,11 +10,12 @@ const HashError = @import("./common.zig").HashError;
 const Parsed = @import("./type.zig").Parsed;
 
 pub fn createUintType(comptime num_bytes: usize) type {
-    if (num_bytes != 2 and num_bytes != 4 and num_bytes != 8) {
-        @compileError("Only support num_bytes of 2, 4 or 8 bytes");
+    if (num_bytes != 1 and num_bytes != 2 and num_bytes != 4 and num_bytes != 8) {
+        @compileError("Only support num_bytes of 1, 2, 4 or 8 bytes");
     }
 
     const T = switch (num_bytes) {
+        1 => u8,
         2 => u16,
         4 => u32,
         8 => u64,
