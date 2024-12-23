@@ -13,6 +13,7 @@ const HashError = @import("./common.zig").HashError;
 const builtin = @import("builtin");
 const native_endian = builtin.target.cpu.arch.endian();
 
+// TODO: int test for this type, miss some implementations
 /// ByteList: Immutable alias of List[byte, N]
 /// ByteList is an immutable value which is represented by a Uint8Array for memory efficiency and performance.
 /// Note: Consumers of this type MUST never mutate the `Uint8Array` representation of a ByteList.

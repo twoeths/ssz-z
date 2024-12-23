@@ -39,7 +39,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
 
         // public apis
 
-        pub fn hashTreeRoot(_: @This(), value: *const T, out: []u8) HashError!void {
+        pub fn hashTreeRoot(_: *const @This(), value: *const T, out: []u8) HashError!void {
             if (out.len != 32) {
                 return error.InCorrectLen;
             }
@@ -65,25 +65,25 @@ pub fn createUintType(comptime num_bytes: usize) type {
             return SingleType.clone(self, value);
         }
 
-        pub fn equals(_: @This(), a: *const T, b: *const T) bool {
+        pub fn equals(_: *const @This(), a: *const T, b: *const T) bool {
             return a.* == b.*;
         }
 
         // Serialization + deserialization
 
         // unused param but want to follow the same interface as other types
-        pub fn serializedSize(_: @This(), _: *const T) usize {
+        pub fn serializedSize(_: *const @This(), _: *const T) usize {
             return num_bytes;
         }
 
-        pub fn serializeToBytes(_: @This(), value: *const T, out: []u8) !usize {
+        pub fn serializeToBytes(_: *const @This(), value: *const T, out: []u8) !usize {
             const slice = std.mem.bytesAsSlice(T, out);
             const endian_value = if (native_endian == .big) @byteSwap(value.*) else value.*;
             slice[0] = endian_value;
             return num_bytes;
         }
 
-        pub fn deserializeFromBytes(_: @This(), bytes: []const u8, out: *T) !void {
+        pub fn deserializeFromBytes(_: *const @This(), bytes: []const u8, out: *T) !void {
             if (bytes.len < num_bytes) {
                 return error.InCorrectLen;
             }
@@ -99,7 +99,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
         /// Same to deserializeFromBytes but this returns *T instead of out param
         /// If this is called from ArrayBasic, out parameter is null so we have to allocate memory
         /// If this is called from a container, out parameter is not null, no need to allocate memory
-        pub fn deserializeFromSlice(_: @This(), arena_allocator: Allocator, slice: []const u8, out: ?*T) SszError!*T {
+        pub fn deserializeFromSlice(_: *const @This(), arena_allocator: Allocator, slice: []const u8, out: ?*T) SszError!*T {
             if (slice.len < num_bytes) {
                 return error.InCorrectLen;
             }
@@ -113,7 +113,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
         }
 
         /// an implementation for parent types
-        pub fn deserializeFromJson(_: @This(), arena_allocator: Allocator, source: *Scanner, out: ?*T) JsonError!*T {
+        pub fn deserializeFromJson(_: *const @This(), arena_allocator: Allocator, source: *Scanner, out: ?*T) JsonError!*T {
             const result = if (out != null) out.? else try arena_allocator.create(T);
             const value = try source.next();
             try switch (value) {
@@ -127,7 +127,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
             return result;
         }
 
-        pub fn doClone(_: @This(), arena_allocator: Allocator, value: *const T, out: ?*T) !*T {
+        pub fn doClone(_: *const @This(), arena_allocator: Allocator, value: *const T, out: ?*T) !*T {
             const out2 = if (out != null) out.? else try arena_allocator.create(T);
             if (value.* < 0) {
                 return error.InvalidInput;

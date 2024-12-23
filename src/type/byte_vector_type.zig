@@ -6,13 +6,14 @@ const maxChunksToDepth = @import("hash").maxChunksToDepth;
 const merkleize = @import("hash").merkleizeBlocksBytes;
 const sha256Hash = @import("hash").sha256Hash;
 const fromHex = @import("util").fromHex;
-const FromHexError = @import("hash").FromHexError;
-const Parsed = @import("hash").Parsed;
+const FromHexError = @import("util").FromHexError;
+const Parsed = @import("./type.zig").Parsed;
 const ParsedResult = Parsed([]u8);
 const SszError = @import("./common.zig").SszError;
 const HashError = @import("./common.zig").HashError;
 const SingleType = @import("./single.zig").withType([]u8);
 
+// TODO: int test for this type
 pub const ByteVectorType = struct {
     allocator: std.mem.Allocator,
     depth: usize,
