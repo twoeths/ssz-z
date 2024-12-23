@@ -13,6 +13,7 @@ const SszError = @import("./common.zig").SszError;
 const HashError = @import("./common.zig").HashError;
 const SingleType = @import("./single.zig").withType([]u8);
 
+// TODO: int test for this type
 pub const ByteVectorType = struct {
     allocator: std.mem.Allocator,
     depth: usize,

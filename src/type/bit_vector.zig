@@ -6,7 +6,7 @@ const maxChunksToDepth = @import("hash").maxChunksToDepth;
 const merkleize = @import("hash").merkleizeBlocksBytes;
 const sha256Hash = @import("hash").sha256Hash;
 const fromHex = @import("util").fromHex;
-const BitArray = @import("./bit_array.zig").BitArray;
+const BitArray = @import("./bit_array_value.zig").BitArray;
 const Parsed = @import("./type.zig").Parsed;
 const ParsedResult = Parsed(BitArray);
 const JsonError = @import("./common.zig").JsonError;
@@ -14,6 +14,9 @@ const SszError = @import("./common.zig").SszError;
 const HashError = @import("./common.zig").HashError;
 const SingleType = @import("./single.zig").withType(BitArray);
 
+/// BitVector: ordered fixed-length collection of boolean values, with N bits
+/// - Notation: `Bitvector[N]`
+/// - Value: `BitArray`, @see BitArray for a justification of its memory efficiency and performance
 pub const BitVectorType = struct {
     allocator: std.mem.Allocator,
     bit_len: usize,
@@ -163,6 +166,10 @@ pub const BitVectorType = struct {
     }
 
     pub fn doClone(self: *const @This(), arena_allocator: Allocator, value: *const BitArray, _: ?*BitArray) !*BitArray {
+        if (value.bit_len != self.bit_len) {
+            return error.InvalidLength;
+        }
+
         const result = try BitArray.fromBitLen(arena_allocator, self.bit_len);
         @memcpy(result.data, value.data);
         return result;

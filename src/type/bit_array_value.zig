@@ -44,7 +44,7 @@ pub const BitArray = struct {
     }
 
     /// Returns a BitArray from an array of booleans representation
-    pub fn fromBoolArray(allocator: Allocator, bool_array: []bool) !*@This() {
+    pub fn fromBoolArray(allocator: Allocator, bool_array: []const bool) !*@This() {
         const bit_len = bool_array.len;
         const bit_array = try fromBitLen(allocator, bit_len);
         for (bool_array, 0..) |bit, i| {
@@ -79,8 +79,9 @@ pub const BitArray = struct {
         }
 
         const byte_index = bit_index / 8;
-        const offset_in_byte = bit_index % 8;
-        const mask = 1 << offset_in_byte;
+        const offset_in_byte: u3 = @intCast(bit_index % 8);
+        const one: u8 = 1;
+        const mask = one << offset_in_byte;
         var byte = self.data[byte_index];
         if (bit) {
             // For bit in byte, 1,0 OR 1 = 1
@@ -122,7 +123,7 @@ pub const BitArray = struct {
 
         var count = 0;
         outer: for (self.data, 0..) |byte, i_byte| {
-            const booleans_in_byte = byteToBitBooleanArrays[byte];
+            const booleans_in_byte = getByteBoolArray(byte);
             for (booleans_in_byte, 0..) |bit, i_bit| {
                 const bit_idx = i_byte * 8 + i_bit;
                 if (bit_idx >= self.bit_len) {
@@ -147,7 +148,7 @@ pub const BitArray = struct {
 
         var count = 0;
         outer: for (self.data, 0..) |byte, i_byte| {
-            const booleans_in_byte = byteToBitBooleanArrays[byte];
+            const booleans_in_byte = getByteBoolArray(byte);
             for (booleans_in_byte, 0..) |bit, i_bit| {
                 const bit_idx = i_byte * 8 + i_bit;
                 if (bit_idx >= self.bit_len) {
@@ -167,7 +168,7 @@ pub const BitArray = struct {
         var found: bool = false;
         var result: usize = -1;
         outer: for (self.data, 0..) |byte, i_byte| {
-            const booleans_in_byte = byteToBitBooleanArrays[byte];
+            const booleans_in_byte = getByteBoolArray(byte);
             for (booleans_in_byte, 0..) |bit, i_bit| {
                 const bit_idx = i_byte * 8 + i_bit;
                 if (bit_idx >= self.bit_len) {
@@ -195,7 +196,7 @@ pub const BitArray = struct {
         }
 
         outer: for (self.data, 0..) |byte, i_byte| {
-            const booleans_in_byte = byteToBitBooleanArrays[byte];
+            const booleans_in_byte = getByteBoolArray(byte);
             for (booleans_in_byte, 0..) |bit, i_bit| {
                 const bit_idx = i_byte * 8 + i_bit;
                 if (bit_idx >= self.bit_len) {
@@ -211,17 +212,19 @@ pub const BitArray = struct {
 /// Globally cache this information
 /// 1 => [true false false false false false false false]
 /// 5 => [true false true false false fase false false]
-const byteToBitBooleanArrays: [256][8]bool = initByteToBitBooleanArrays();
+var byteToBitBooleanArrays: [256]?[8]bool = [_]?[8]bool{null} ** 256;
 
-fn initByteToBitBooleanArrays() [256][8]bool {
-    var arrays: [256][8]bool = [_][8]bool{[_]bool{false} ** 8} ** 256;
-
-    inline for (0..256) |byte| {
-        inline for (0..8) |bit| {
+pub fn getByteBoolArray(byte: u8) [8]bool {
+    const value = byteToBitBooleanArrays[byte];
+    return if (value == null) {
+        var value2 = [_]bool{false} ** 8;
+        for (0..8) |bit| {
             // little endian
-            arrays[byte][bit] = (byte & (1 << bit)) != 0;
+            const one: u8 = 1;
+            const to_shift: u3 = @intCast(bit);
+            value2[bit] = (byte & (one << to_shift)) != 0;
         }
-    }
-
-    return arrays;
+        byteToBitBooleanArrays[byte] = value2;
+        return value2;
+    } else value.?;
 }

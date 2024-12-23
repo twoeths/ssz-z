@@ -11,6 +11,7 @@ pub const createListCompositeType = @import("type/list_composite.zig").createLis
 pub const ByteVectorType = @import("type/byte_vector_type.zig").ByteVectorType;
 pub const createVectorCompositeType = @import("type/vector_composite.zig").createVectorCompositeType;
 pub const BitVectorType = @import("type/bit_vector.zig").BitVectorType;
+pub const createBitListType = @import("type/bit_list.zig").createBitListType;
 pub const Parsed = @import("type/type.zig").Parsed;
 
 test {
