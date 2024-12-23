@@ -105,7 +105,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
                 return error.InCorrectLen;
             }
 
-            const result = if (out != null) out.? else try arena_allocator.create(T);
+            const result = out orelse try arena_allocator.create(T);
             const sliceT = std.mem.bytesAsSlice(T, slice);
             const value = sliceT[0];
             const endian_value = if (native_endian == .big) @byteSwap(value) else value;
@@ -115,7 +115,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
 
         /// an implementation for parent types
         pub fn deserializeFromJson(_: *const @This(), arena_allocator: Allocator, source: *Scanner, out: ?*T) JsonError!*T {
-            const result = if (out != null) out.? else try arena_allocator.create(T);
+            const result = out orelse try arena_allocator.create(T);
             const value = try source.next();
             try switch (value) {
                 // uintN is mapped to string in consensus spec https://github.com/ethereum/consensus-specs/blob/dev/ssz/simple-serialize.md#json-mapping
@@ -129,7 +129,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
         }
 
         pub fn doClone(_: *const @This(), arena_allocator: Allocator, value: *const T, out: ?*T) !*T {
-            const out2 = if (out != null) out.? else try arena_allocator.create(T);
+            const out2 = out orelse try arena_allocator.create(T);
             if (value.* < 0) {
                 return error.InvalidInput;
             }

@@ -196,7 +196,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         /// for embedded struct, it's allocated by the parent struct
         /// for pointer or slice, it's allocated on its own
         pub fn deserializeFromSlice(self: *const @This(), arenaAllocator: Allocator, slice: []const u8, out: ?*ZT) SszError!*ZT {
-            var out2 = if (out != null) out.? else try arenaAllocator.create(ZT);
+            var out2 = out orelse try arenaAllocator.create(ZT);
 
             // TODO: validate data length
             // max_chunk_count is known at compile time so we can allocate on stack
@@ -220,7 +220,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
 
         /// a recursive implementation for parent types or fromJson
         pub fn deserializeFromJson(self: *const @This(), arena_allocator: Allocator, source: *Scanner, out: ?*ZT) JsonError!*ZT {
-            var out2 = if (out != null) out.? else try arena_allocator.create(ZT);
+            var out2 = out orelse try arena_allocator.create(ZT);
             // validate begin token "{"
             const begin_object_token = try source.next();
             if (begin_object_token != Token.object_begin) {
@@ -258,7 +258,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         }
 
         pub fn doClone(self: *const @This(), arena_allocator: Allocator, value: *const ZT, out: ?*ZT) !*ZT {
-            var out2 = if (out != null) out.? else try arena_allocator.create(ZT);
+            var out2 = out orelse try arena_allocator.create(ZT);
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const ssz_type = &@field(self.ssz_fields, field_name);

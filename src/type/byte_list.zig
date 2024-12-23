@@ -154,7 +154,7 @@ pub fn createByteListType(comptime limit_bytes: usize) type {
         }
 
         pub fn doClone(_: *const @This(), arena_allocator: Allocator, value: []const u8, out: ?[]u8) ![]u8 {
-            const out2 = if (out != null) out.? else try arena_allocator.alloc(u8, value.len);
+            const out2 = out orelse try arena_allocator.alloc(u8, value.len);
             @memcpy(out2, value);
             return out2;
         }

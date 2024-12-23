@@ -145,7 +145,7 @@ pub const ByteVectorType = struct {
     }
 
     pub fn doClone(self: *const @This(), arena_allocator: Allocator, value: []const u8, out: ?[]u8) ![]u8 {
-        const out2 = if (out != null) out.? else try arena_allocator.alloc(u8, self.fixed_size.?);
+        const out2 = out orelse try arena_allocator.alloc(u8, self.fixed_size.?);
         @memcpy(out2, value);
         return out2;
     }
