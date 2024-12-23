@@ -97,8 +97,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 try ssz_type.hashTreeRoot(field_value_ptr, self.blocks_bytes[(i * 32) .. (i + 1) * 32]);
             }
 
-            const result = try merkleize(hashFn, self.blocks_bytes, max_chunk_count, out);
-            return result;
+            return merkleize(hashFn, self.blocks_bytes, max_chunk_count, out);
         }
 
         pub fn fromSsz(self: *const @This(), ssz: []const u8) SszError!ParsedResult {

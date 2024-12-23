@@ -80,8 +80,7 @@ pub const BitArray = struct {
 
         const byte_index = bit_index / 8;
         const offset_in_byte: u3 = @intCast(bit_index % 8);
-        const one: u8 = 1;
-        const mask = one << offset_in_byte;
+        const mask = @as(u8, 1) << offset_in_byte;
         var byte = self.data[byte_index];
         if (bit) {
             // For bit in byte, 1,0 OR 1 = 1
@@ -220,9 +219,8 @@ pub fn getByteBoolArray(byte: u8) [8]bool {
         var value2 = [_]bool{false} ** 8;
         for (0..8) |bit| {
             // little endian
-            const one: u8 = 1;
             const to_shift: u3 = @intCast(bit);
-            value2[bit] = (byte & (one << to_shift)) != 0;
+            value2[bit] = (byte & (@as(u8, 1) << to_shift)) != 0;
         }
         byteToBitBooleanArrays[byte] = value2;
         return value2;
