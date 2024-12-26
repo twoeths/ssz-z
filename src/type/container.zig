@@ -18,6 +18,7 @@ const BytesRange = struct {
     end: usize,
 };
 
+/// TODO: defaultValue() for all types
 // create a ssz type from type of an ssz object
 // type of zig type will be used once and checked inside hashTreeRoot() function
 pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn) type {
@@ -91,14 +92,14 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             // this will also enforce all fields in value match ssz_fields
             inline for (zig_fields_info, 0..) |field_info, i| {
                 const field_name = field_info.name;
-                // this avoids a copy
-                const field_value_ptr = if (@typeInfo(field_info.type) == .Pointer) @field(value, field_name) else &@field(value, field_name);
+                const field_type = @typeInfo(field_info.type);
+                // by default use pointer to avoid a copy
+                const field_value_ptr = if (field_type == .Pointer or field_type == .Bool or field_type == .Int) @field(value, field_name) else &@field(value, field_name);
                 const ssz_type = &@field(self.ssz_fields, field_name);
                 try ssz_type.hashTreeRoot(field_value_ptr, self.blocks_bytes[(i * 32) .. (i + 1) * 32]);
             }
 
-            const result = try merkleize(hashFn, self.blocks_bytes, max_chunk_count, out);
-            return result;
+            return merkleize(hashFn, self.blocks_bytes, max_chunk_count, out);
         }
 
         pub fn fromSsz(self: *const @This(), ssz: []const u8) SszError!ParsedResult {
@@ -119,8 +120,9 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const ssz_type = &@field(self.ssz_fields, field_name);
-                const a_field_ptr = if (@typeInfo(field_info.type) == .Pointer) @field(a, field_name) else &@field(a, field_name);
-                const b_field_ptr = if (@typeInfo(field_info.type) == .Pointer) @field(b, field_name) else &@field(b, field_name);
+                const field_type = @typeInfo(field_info.type);
+                const a_field_ptr = if (field_type == .Pointer or field_type == .Bool or field_type == .Int) @field(a, field_name) else &@field(a, field_name);
+                const b_field_ptr = if (field_type == .Pointer or field_type == .Bool or field_type == .Int) @field(b, field_name) else &@field(b, field_name);
                 if (!ssz_type.equals(a_field_ptr, b_field_ptr)) {
                     return false;
                 }
@@ -139,11 +141,13 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             var size: usize = 0;
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
-                const field_value_ptr = &@field(value, field_name);
+                const field_type = @typeInfo(field_info.type);
+                const field_value = @field(value, field_name);
+                const field_value_or_ptr = if (field_type == .Pointer or field_type == .Bool or field_type == .Int) field_value else &field_value;
                 const ssz_type = &@field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
                     size += 4;
-                    size += ssz_type.serializedSize(field_value_ptr);
+                    size += ssz_type.serializedSize(field_value_or_ptr);
                 } else {
                     size += ssz_type.fixed_size.?;
                 }
@@ -158,7 +162,9 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
 
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
-                const field_value_ptr = if (@typeInfo(field_info.type) == .Pointer) @field(value, field_name) else &@field(value, field_name);
+                const field_type = @typeInfo(field_info.type);
+                const field_value = @field(value, field_name);
+                const field_value_or_ptr = if (field_type == .Pointer or field_type == .Bool or field_type == .Int) field_value else &field_value;
                 const ssz_type = &@field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
                     // write offset
@@ -168,9 +174,9 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                     fixed_index += 4;
                     // write serialized element to variable section
                     // ssz_type.serializeToBytes returns number of bytes written
-                    variable_index += try ssz_type.serializeToBytes(field_value_ptr, out[variable_index..]);
+                    variable_index += try ssz_type.serializeToBytes(field_value_or_ptr, out[variable_index..]);
                 } else {
-                    fixed_index += try ssz_type.serializeToBytes(field_value_ptr, out[fixed_index..]);
+                    fixed_index += try ssz_type.serializeToBytes(field_value_or_ptr, out[fixed_index..]);
                 }
             }
 
@@ -196,7 +202,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         /// for embedded struct, it's allocated by the parent struct
         /// for pointer or slice, it's allocated on its own
         pub fn deserializeFromSlice(self: *const @This(), arenaAllocator: Allocator, slice: []const u8, out: ?*ZT) SszError!*ZT {
-            var out2 = if (out != null) out.? else try arenaAllocator.create(ZT);
+            var out2 = out orelse try arenaAllocator.create(ZT);
 
             // TODO: validate data length
             // max_chunk_count is known at compile time so we can allocate on stack
@@ -207,8 +213,9 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 const ssz_type = &@field(self.ssz_fields, field_name);
                 const field_range = field_ranges[i];
                 const field_data = slice[field_range.start..field_range.end];
+                const field_type = @typeInfo(field_info.type);
 
-                if (@typeInfo(field_info.type) == .Pointer) {
+                if (field_type == .Pointer or field_type == .Bool or field_type == .Int) {
                     @field(out2, field_name) = try ssz_type.deserializeFromSlice(arenaAllocator, field_data, null);
                 } else {
                     _ = try ssz_type.deserializeFromSlice(arenaAllocator, field_data, &@field(out2, field_name));
@@ -220,7 +227,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
 
         /// a recursive implementation for parent types or fromJson
         pub fn deserializeFromJson(self: *const @This(), arena_allocator: Allocator, source: *Scanner, out: ?*ZT) JsonError!*ZT {
-            var out2 = if (out != null) out.? else try arena_allocator.create(ZT);
+            var out2 = out orelse try arena_allocator.create(ZT);
             // validate begin token "{"
             const begin_object_token = try source.next();
             if (begin_object_token != Token.object_begin) {
@@ -241,7 +248,8 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 }
 
                 const ssz_type = &@field(self.ssz_fields, field_name);
-                if (@typeInfo(field_info.type) == .Pointer) {
+                const field_type = @typeInfo(field_info.type);
+                if (field_type == .Pointer or field_type == .Bool or field_type == .Int) {
                     @field(out2, field_name) = try ssz_type.deserializeFromJson(arena_allocator, source, null);
                 } else {
                     _ = try ssz_type.deserializeFromJson(arena_allocator, source, &@field(out2, field_name));
@@ -258,11 +266,12 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         }
 
         pub fn doClone(self: *const @This(), arena_allocator: Allocator, value: *const ZT, out: ?*ZT) !*ZT {
-            var out2 = if (out != null) out.? else try arena_allocator.create(ZT);
+            var out2 = out orelse try arena_allocator.create(ZT);
             inline for (zig_fields_info) |field_info| {
                 const field_name = field_info.name;
                 const ssz_type = &@field(self.ssz_fields, field_name);
-                if (@typeInfo(field_info.type) == .Pointer) {
+                const field_type = @typeInfo(field_info.type);
+                if (field_type == .Pointer or field_type == .Bool or field_type == .Int) {
                     @field(out2, field_name) = try ssz_type.doClone(arena_allocator, @field(value, field_name), null);
                 } else {
                     _ = try ssz_type.doClone(arena_allocator, &@field(value, field_name), &@field(out2, field_name));
@@ -330,44 +339,45 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
     return ContainerType;
 }
 
-test "basic ContainerType {x: uint, y:uint}" {
+test "basic ContainerType {x: uint, y:bool}" {
     var allocator = std.testing.allocator;
     const UintType = @import("./uint.zig").createUintType(8);
     const uintType = try UintType.init();
+    defer uintType.deinit();
+    const BooleanType = @import("./boolean.zig").BooleanType;
+    const booleanType = BooleanType.init();
+    defer booleanType.deinit();
     const SszType = struct {
         x: UintType,
-        y: UintType,
+        y: BooleanType,
     };
     const ZigType = struct {
         x: u64,
-        y: u64,
+        y: bool,
     };
     const ContainerType = createContainerType(SszType, ZigType, sha256Hash);
     var containerType = try ContainerType.init(allocator, SszType{
         .x = uintType,
-        .y = uintType,
+        .y = booleanType,
     });
 
     defer containerType.deinit();
 
-    const obj = ZigType{ .x = 0xffffffffffffffff, .y = 0 };
+    const obj = ZigType{ .x = 0xffffffffffffffff, .y = false };
     var root = [_]u8{0} ** 32;
     try containerType.hashTreeRoot(&obj, root[0..]);
     const rootHex = try toRootHex(root[0..]);
-    // 0x59a751e5d7d17ee0f3eebab3ef17512aca150acc6f59173d6e217cccced5f0d4
-    try std.testing.expectEqualSlices(u8, "0x59a751e5d7d17ee0f3eebab3ef17512aca150acc6f59173d6e217cccced5f0d4", rootHex);
+    try std.testing.expectEqualSlices(u8, "0x6f8396f940737bdb29cc6ba2aba7ec405050f70871c05ed2a2c30b800cb79df6", rootHex);
 
     const size = containerType.serializedSize(&obj);
-    // 2 uint64 = 2 * 8 = 16 bytes
-    try expect(size == 16);
+    // 1 uint64 + 1 bool = 8 + 1 = 9 bytes
+    try expect(size == 9);
     const bytes = try allocator.alloc(u8, size);
     defer allocator.free(bytes);
     _ = try containerType.serializeToBytes(&obj, bytes);
-    var obj2: ZigType = undefined;
-    _ = try containerType.deserializeFromBytes(bytes, &obj2);
-    try expect(obj2.x == obj.x);
-    try expect(obj2.y == obj.y);
-    try expect(containerType.equals(&obj, &obj2));
+    const obj2 = try containerType.fromSsz(bytes);
+    defer obj2.deinit();
+    try expect(containerType.equals(&obj, obj2.value));
 
     // clone
     const cloned_result = try containerType.clone(&obj);
@@ -378,7 +388,7 @@ test "basic ContainerType {x: uint, y:uint}" {
     try expect(obj3.y == obj.y);
 
     // fromJson
-    const json = "{ \"x\": \"18446744073709551615\", \"y\": \"0\" }";
+    const json = "{ \"x\": \"18446744073709551615\", \"y\": false }";
     const parsed = try containerType.fromJson(json);
     defer parsed.deinit();
     try expect(parsed.value.x == obj.x);

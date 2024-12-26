@@ -10,11 +10,12 @@ const HashError = @import("./common.zig").HashError;
 const Parsed = @import("./type.zig").Parsed;
 
 pub fn createUintType(comptime num_bytes: usize) type {
-    if (num_bytes != 2 and num_bytes != 4 and num_bytes != 8) {
-        @compileError("Only support num_bytes of 2, 4 or 8 bytes");
+    if (num_bytes != 1 and num_bytes != 2 and num_bytes != 4 and num_bytes != 8) {
+        @compileError("Only support num_bytes of 1, 2, 4 or 8 bytes");
     }
 
     const T = switch (num_bytes) {
+        1 => u8,
         2 => u16,
         4 => u32,
         8 => u64,
@@ -39,7 +40,8 @@ pub fn createUintType(comptime num_bytes: usize) type {
 
         // public apis
 
-        pub fn hashTreeRoot(_: *const @This(), value: *const T, out: []u8) HashError!void {
+        // TODO: no need to pass value as pointer here?
+        pub fn hashTreeRoot(_: *const @This(), value: T, out: []u8) HashError!void {
             if (out.len != 32) {
                 return error.InCorrectLen;
             }
@@ -49,7 +51,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
             }
 
             const slice = std.mem.bytesAsSlice(T, out);
-            const endian_value = if (native_endian == .big) @byteSwap(value.*) else value.*;
+            const endian_value = if (native_endian == .big) @byteSwap(value) else value;
             slice[0] = endian_value;
         }
 
@@ -61,24 +63,26 @@ pub fn createUintType(comptime num_bytes: usize) type {
             return SingleType.fromJson(self, json);
         }
 
-        pub fn clone(self: *const @This(), value: *const T) SszError!ParsedResult {
+        pub fn clone(self: *const @This(), value: T) SszError!ParsedResult {
             return SingleType.clone(self, value);
         }
 
-        pub fn equals(_: *const @This(), a: *const T, b: *const T) bool {
-            return a.* == b.*;
+        pub fn equals(_: *const @This(), a: T, b: T) bool {
+            return a == b;
         }
 
         // Serialization + deserialization
 
         // unused param but want to follow the same interface as other types
-        pub fn serializedSize(_: *const @This(), _: *const T) usize {
+        pub fn serializedSize(_: *const @This(), _: T) usize {
             return num_bytes;
         }
 
-        pub fn serializeToBytes(_: *const @This(), value: *const T, out: []u8) !usize {
-            const slice = std.mem.bytesAsSlice(T, out);
-            const endian_value = if (native_endian == .big) @byteSwap(value.*) else value.*;
+        pub fn serializeToBytes(_: *const @This(), value: T, out: []u8) !usize {
+            // bytesAsSlice has @divExact so need to be multiple of T
+            const end = (out.len / @sizeOf(T)) * @sizeOf(T);
+            const slice = std.mem.bytesAsSlice(T, out[0..end]);
+            const endian_value = if (native_endian == .big) @byteSwap(value) else value;
             slice[0] = endian_value;
             return num_bytes;
         }
@@ -96,45 +100,32 @@ pub fn createUintType(comptime num_bytes: usize) type {
             out.* = endian_value;
         }
 
-        /// Same to deserializeFromBytes but this returns *T instead of out param
-        /// If this is called from ArrayBasic, out parameter is null so we have to allocate memory
-        /// If this is called from a container, out parameter is not null, no need to allocate memory
-        pub fn deserializeFromSlice(_: *const @This(), arena_allocator: Allocator, slice: []const u8, out: ?*T) SszError!*T {
+        /// Same to deserializeFromBytes but this returns T instead of out param
+        /// both arena_allocator and out parameter are not used, this is just to follow the same interface
+        pub fn deserializeFromSlice(_: *const @This(), _: Allocator, slice: []const u8, _: ?T) SszError!T {
             if (slice.len < num_bytes) {
                 return error.InCorrectLen;
             }
 
-            const result = if (out != null) out.? else try arena_allocator.create(T);
             const sliceT = std.mem.bytesAsSlice(T, slice);
             const value = sliceT[0];
-            const endian_value = if (native_endian == .big) @byteSwap(value) else value;
-            result.* = endian_value;
-            return result;
+            return if (native_endian == .big) @byteSwap(value) else value;
         }
 
         /// an implementation for parent types
-        pub fn deserializeFromJson(_: *const @This(), arena_allocator: Allocator, source: *Scanner, out: ?*T) JsonError!*T {
-            const result = if (out != null) out.? else try arena_allocator.create(T);
+        pub fn deserializeFromJson(_: *const @This(), _: Allocator, source: *Scanner, _: ?T) JsonError!T {
             const value = try source.next();
             try switch (value) {
                 // uintN is mapped to string in consensus spec https://github.com/ethereum/consensus-specs/blob/dev/ssz/simple-serialize.md#json-mapping
                 .string => |v| {
-                    result.* = try sliceToInt(T, v);
+                    return try sliceToInt(T, v);
                 },
-                else => error.InvalidJson,
+                else => return error.InvalidJson,
             };
-
-            return result;
         }
 
-        pub fn doClone(_: *const @This(), arena_allocator: Allocator, value: *const T, out: ?*T) !*T {
-            const out2 = if (out != null) out.? else try arena_allocator.create(T);
-            if (value.* < 0) {
-                return error.InvalidInput;
-            }
-            out2.* = value.*;
-
-            return out2;
+        pub fn doClone(_: *const @This(), _: Allocator, value: T, _: ?*T) !T {
+            return value;
         }
     };
 }
@@ -162,7 +153,7 @@ test "createUintType" {
     defer uintType.deinit();
     const value: u64 = 0xffffffffffffffff;
     var root = [_]u8{0} ** 32;
-    try uintType.hashTreeRoot(&value, root[0..]);
+    try uintType.hashTreeRoot(value, root[0..]);
 
     // TODO: more unit tests: serialize + deserialize, clone, make sure can mutate output values
     // var out: [8]u8 = undefined;

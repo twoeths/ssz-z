@@ -139,8 +139,7 @@ pub fn createBitListType(comptime limit_bits: usize) type {
                 return value_byte_len + 1;
             } else {
                 const shift: u3 = @intCast(value.bit_len % 8);
-                const value_to_shift: u8 = 1;
-                out[value_byte_len - 1] |= value_to_shift << shift;
+                out[value_byte_len - 1] |= @as(u8, 1) << shift;
                 return value_byte_len;
             }
         }
@@ -205,8 +204,7 @@ pub fn createBitListType(comptime limit_bits: usize) type {
             // should be freed by the consumer using arena_allocator
             try fromHex(hex, slice);
 
-            const des_res = self.deserializeFromSlice(arena_allocator, slice, null);
-            const res = if (des_res) |bit_array| bit_array else |err| switch (err) {
+            const res = self.deserializeFromSlice(arena_allocator, slice, null) catch |err| switch (err) {
                 else => return error.InvalidJson,
             };
             return res;
