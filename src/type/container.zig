@@ -93,8 +93,8 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
             inline for (zig_fields_info, 0..) |field_info, i| {
                 const field_name = field_info.name;
                 const field_type = @typeInfo(field_info.type);
-                // this avoids a copy
-                const field_value_ptr = if (field_type == .Pointer or field_type == .Bool) @field(value, field_name) else &@field(value, field_name);
+                // by default use pointer to avoid a copy
+                const field_value_ptr = if (field_type == .Pointer or field_type == .Bool or field_type == .Int) @field(value, field_name) else &@field(value, field_name);
                 const ssz_type = &@field(self.ssz_fields, field_name);
                 try ssz_type.hashTreeRoot(field_value_ptr, self.blocks_bytes[(i * 32) .. (i + 1) * 32]);
             }
@@ -121,8 +121,8 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 const field_name = field_info.name;
                 const ssz_type = &@field(self.ssz_fields, field_name);
                 const field_type = @typeInfo(field_info.type);
-                const a_field_ptr = if (field_type == .Pointer or field_type == .Bool) @field(a, field_name) else &@field(a, field_name);
-                const b_field_ptr = if (field_type == .Pointer or field_type == .Bool) @field(b, field_name) else &@field(b, field_name);
+                const a_field_ptr = if (field_type == .Pointer or field_type == .Bool or field_type == .Int) @field(a, field_name) else &@field(a, field_name);
+                const b_field_ptr = if (field_type == .Pointer or field_type == .Bool or field_type == .Int) @field(b, field_name) else &@field(b, field_name);
                 if (!ssz_type.equals(a_field_ptr, b_field_ptr)) {
                     return false;
                 }
@@ -143,7 +143,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 const field_name = field_info.name;
                 const field_type = @typeInfo(field_info.type);
                 const field_value = @field(value, field_name);
-                const field_value_or_ptr = if (field_type == .Pointer or field_type == .Bool) field_value else &field_value;
+                const field_value_or_ptr = if (field_type == .Pointer or field_type == .Bool or field_type == .Int) field_value else &field_value;
                 const ssz_type = &@field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
                     size += 4;
@@ -164,7 +164,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 const field_name = field_info.name;
                 const field_type = @typeInfo(field_info.type);
                 const field_value = @field(value, field_name);
-                const field_value_or_ptr = if (field_type == .Pointer or field_type == .Bool) field_value else &field_value;
+                const field_value_or_ptr = if (field_type == .Pointer or field_type == .Bool or field_type == .Int) field_value else &field_value;
                 const ssz_type = &@field(self.ssz_fields, field_name);
                 if (ssz_type.fixed_size == null) {
                     // write offset
@@ -215,7 +215,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 const field_data = slice[field_range.start..field_range.end];
                 const field_type = @typeInfo(field_info.type);
 
-                if (field_type == .Pointer or field_type == .Bool) {
+                if (field_type == .Pointer or field_type == .Bool or field_type == .Int) {
                     @field(out2, field_name) = try ssz_type.deserializeFromSlice(arenaAllocator, field_data, null);
                 } else {
                     _ = try ssz_type.deserializeFromSlice(arenaAllocator, field_data, &@field(out2, field_name));
@@ -249,7 +249,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
 
                 const ssz_type = &@field(self.ssz_fields, field_name);
                 const field_type = @typeInfo(field_info.type);
-                if (field_type == .Pointer or field_type == .Bool) {
+                if (field_type == .Pointer or field_type == .Bool or field_type == .Int) {
                     @field(out2, field_name) = try ssz_type.deserializeFromJson(arena_allocator, source, null);
                 } else {
                     _ = try ssz_type.deserializeFromJson(arena_allocator, source, &@field(out2, field_name));
@@ -271,7 +271,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
                 const field_name = field_info.name;
                 const ssz_type = &@field(self.ssz_fields, field_name);
                 const field_type = @typeInfo(field_info.type);
-                if (field_type == .Pointer or field_type == .Bool) {
+                if (field_type == .Pointer or field_type == .Bool or field_type == .Int) {
                     @field(out2, field_name) = try ssz_type.doClone(arena_allocator, @field(value, field_name), null);
                 } else {
                     _ = try ssz_type.doClone(arena_allocator, &@field(value, field_name), &@field(out2, field_name));

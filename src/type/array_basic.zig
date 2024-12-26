@@ -33,7 +33,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
 
             // out.len is not necessarily the same to byte_len
 
-            for (value, 0..) |*elem, i| {
+            for (value, 0..) |elem, i| {
                 _ = try element_type.serializeToBytes(elem, out[i * elem_byte_length .. (i + 1) * elem_byte_length]);
             }
 
@@ -70,10 +70,10 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             }
 
             const result = try arenaAllocator.alloc(ZT, elem_count);
+            // TODO: use std.mem.bytesAsSlice() once for better performance?
             for (result, 0..) |*elem, i| {
-                // TODO: how to avoid the copy? or we can use ArrayList used in deserializeFromJson
                 // improve this when we have benchmark test
-                elem.* = (try element_type.deserializeFromSlice(arenaAllocator, data[i * elem_byte_length .. (i + 1) * elem_byte_length], null)).*;
+                elem.* = (try element_type.deserializeFromSlice(arenaAllocator, data[i * elem_byte_length .. (i + 1) * elem_byte_length], null));
             }
 
             return result;
@@ -100,9 +100,8 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
                 }
 
                 try arraylist.ensureUnusedCapacity(1);
-                // TODO: we can also allocate ZT here, and pass its address to deserializeFromJson
-                const elem_ptr = try element_type.deserializeFromJson(arena_allocator, source, null);
-                arraylist.appendAssumeCapacity(elem_ptr.*);
+                const elem = try element_type.deserializeFromJson(arena_allocator, source, null);
+                arraylist.appendAssumeCapacity(elem);
 
                 if (expected_len != null and arraylist.items.len > expected_len.?) {
                     return error.InCorrectLen;

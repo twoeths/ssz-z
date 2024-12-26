@@ -8,7 +8,7 @@ pub fn Parsed(comptime T: type) type {
     return struct {
         arena: *ArenaAllocator,
         // do not want to use pointer to pointer
-        value: if (type_info == .Pointer or type_info == .Bool) T else *T,
+        value: if (type_info == .Pointer or type_info == .Bool or type_info == .Int) T else *T,
 
         pub fn deinit(self: *const @This()) void {
             const allocator = self.arena.child_allocator;

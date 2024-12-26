@@ -29,12 +29,13 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
                 return false;
             }
 
-            const item_is_ptr = @typeInfo(ZT) == .Pointer;
+            const type_info = @typeInfo(ZT);
+            const pass_by_value = type_info == .Pointer or type_info == .Bool or type_info == .Int;
 
             for (a, b) |*a_elem, *b_elem| {
                 // ZT could be a slice, in that case we should pass elem itself instead of pointer to pointer
-                const a_elem_ptr = if (item_is_ptr) a_elem.* else a_elem;
-                const b_elem_ptr = if (item_is_ptr) b_elem.* else b_elem;
+                const a_elem_ptr = if (pass_by_value) a_elem.* else a_elem;
+                const b_elem_ptr = if (pass_by_value) b_elem.* else b_elem;
                 if (!element_type.equals(a_elem_ptr, b_elem_ptr)) {
                     return false;
                 }
@@ -49,10 +50,11 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
                 return error.InCorrectLen;
             }
 
-            const item_is_ptr = @typeInfo(ZT) == .Pointer;
+            const type_info = @typeInfo(ZT);
+            const pass_by_value = type_info == .Pointer or type_info == .Bool or type_info == .Int;
 
             for (value, out2, 0..) |*elem, *out_elem, i| {
-                if (item_is_ptr) {
+                if (pass_by_value) {
                     // ZT could be a slice, in that case we should pass elem itself instead of pointer to pointer
                     const elem_ptr = elem.*;
                     out2[i] = try element_type.doClone(arena_allocator, elem_ptr, null);
