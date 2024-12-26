@@ -40,6 +40,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
 
         // public apis
 
+        // TODO: no need to pass value as pointer here?
         pub fn hashTreeRoot(_: *const @This(), value: *const T, out: []u8) HashError!void {
             if (out.len != 32) {
                 return error.InCorrectLen;
@@ -78,7 +79,9 @@ pub fn createUintType(comptime num_bytes: usize) type {
         }
 
         pub fn serializeToBytes(_: *const @This(), value: *const T, out: []u8) !usize {
-            const slice = std.mem.bytesAsSlice(T, out);
+            // bytesAsSlice has @divExact so need to be multiple of T
+            const end = (out.len / @sizeOf(T)) * @sizeOf(T);
+            const slice = std.mem.bytesAsSlice(T, out[0..end]);
             const endian_value = if (native_endian == .big) @byteSwap(value.*) else value.*;
             slice[0] = endian_value;
             return num_bytes;
