@@ -6,7 +6,7 @@ const deinitZeroHash = @import("hash").deinitZeroHash;
 const TestCase = @import("common.zig").TypeTestCase;
 const createUintType = @import("ssz").createUintType;
 const createListCompositeType = @import("ssz").createListCompositeType;
-const ByteVectorType = @import("ssz").ByteVectorType;
+const createByteVectorType = @import("ssz").createByteVectorType;
 const createContainerType = @import("ssz").createContainerType;
 const sha256Hash = @import("hash").sha256Hash;
 const createListBasicType = @import("ssz").createListBasicType;
@@ -28,7 +28,8 @@ test "ListCompositeType - element type ByteVectorType" {
     };
 
     const allocator = std.testing.allocator;
-    var byte_vector_type = try ByteVectorType.init(allocator, 32);
+    const ByteVectorType = createByteVectorType(32);
+    var byte_vector_type = try ByteVectorType.init(allocator);
     defer byte_vector_type.deinit();
 
     const ListCompositeType = createListCompositeType(ByteVectorType);

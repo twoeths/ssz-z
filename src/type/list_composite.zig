@@ -169,8 +169,9 @@ test "ListCompositeType - element type ByteVectorType" {
     var allocator = std.testing.allocator;
     try initZeroHash(&allocator, 32);
     defer deinitZeroHash();
-    const ByteVectorType = @import("./byte_vector_type.zig").ByteVectorType;
-    var byteVectorType = try ByteVectorType.init(allocator, 32);
+    const createByteVectorType = @import("./byte_vector_type.zig").createByteVectorType;
+    const ByteVectorType = createByteVectorType(32);
+    var byteVectorType = try ByteVectorType.init(allocator);
     defer byteVectorType.deinit();
 
     const ListCompositeType = createListCompositeType(ByteVectorType);
