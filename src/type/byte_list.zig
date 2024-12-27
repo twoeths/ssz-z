@@ -34,6 +34,15 @@ pub fn createByteListType(comptime limit_bytes: usize) type {
         block_bytes: BlockBytes,
         mix_in_length_block_bytes: []u8,
 
+        /// Zig Type definition
+        pub fn getZigType() type {
+            return []u8;
+        }
+
+        pub fn getZigTypeAlignment() usize {
+            return @alignOf([]u8);
+        }
+
         pub fn init(allocator: std.mem.Allocator, init_capacity: usize) !@This() {
             return @This(){ .allocator = allocator, .block_bytes = try BlockBytes.initCapacity(allocator, init_capacity), .mix_in_length_block_bytes = try allocator.alloc(u8, 64) };
         }

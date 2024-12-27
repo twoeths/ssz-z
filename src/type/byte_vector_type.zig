@@ -25,6 +25,15 @@ pub const ByteVectorType = struct {
     // this should always be a multiple of 64 bytes
     block_bytes: []u8,
 
+    /// Zig Type definition
+    pub fn getZigType() type {
+        return []u8;
+    }
+
+    pub fn getZigTypeAlignment() usize {
+        return @alignOf([]u8);
+    }
+
     pub fn init(allocator: std.mem.Allocator, length_bytes: usize) !@This() {
         const max_chunk_count: usize = (length_bytes + 31) / 32;
         const chunk_depth = maxChunksToDepth(max_chunk_count);

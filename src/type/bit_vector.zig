@@ -39,6 +39,15 @@ pub const BitVectorType = struct {
     // this should always be a multiple of 64 bytes
     block_bytes: []u8,
 
+    /// Zig Type definition
+    pub fn getZigType() type {
+        return BitArray;
+    }
+
+    pub fn getZigTypeAlignment() usize {
+        return @alignOf(BitArray);
+    }
+
     pub fn init(allocator: std.mem.Allocator, comptime length_bits: usize) !@This() {
         if (length_bits <= 0) {
             return error.InvalidLength;

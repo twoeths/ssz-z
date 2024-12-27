@@ -30,6 +30,15 @@ pub fn createUintType(comptime num_bytes: usize) type {
         min_size: usize,
         max_size: usize,
 
+        /// Zig Type definition
+        pub fn getZigType() type {
+            return T;
+        }
+
+        pub fn getZigTypeAlignment() usize {
+            return num_bytes;
+        }
+
         pub fn init() !@This() {
             return @This(){ .fixed_size = num_bytes, .byte_length = num_bytes, .min_size = 0, .max_size = num_bytes };
         }

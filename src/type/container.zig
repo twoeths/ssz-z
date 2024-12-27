@@ -21,7 +21,41 @@ const BytesRange = struct {
 /// TODO: defaultValue() for all types
 // create a ssz type from type of an ssz object
 // type of zig type will be used once and checked inside hashTreeRoot() function
-pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn) type {
+pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
+    const ssz_struct_info = switch (@typeInfo(ST)) {
+        .Struct => |struct_info| struct_info,
+        else => @compileError("Expected a struct type."),
+    };
+
+    comptime var new_fields: [ssz_struct_info.fields.len]std.builtin.Type.StructField = undefined;
+    comptime var alignment: usize = 0;
+    inline for (ssz_struct_info.fields, 0..) |field, i| {
+        if (field.type.getZigTypeAlignment() > alignment) {
+            alignment = field.type.getZigTypeAlignment();
+        }
+        new_fields[i] = .{
+            .name = field.name,
+            .type = field.type.getZigType(),
+            // TODO: implement this
+            .default_value = null,
+            .is_comptime = false,
+            .alignment = field.type.getZigTypeAlignment(),
+        };
+    }
+
+    // this works for Zig 0.13
+    // syntax in 0.14 or later could change, see https://github.com/ziglang/zig/issues/10710
+    const ZT = comptime @Type(.{
+        .Struct = .{
+            .layout = .auto,
+            .backing_integer = null,
+            .fields = new_fields[0..],
+            // TODO: do we need to assign this value?
+            .decls = &[_]std.builtin.Type.Declaration{},
+            .is_tuple = false,
+        },
+    });
+
     const zig_fields_info = @typeInfo(ZT).Struct.fields;
     const max_chunk_count = zig_fields_info.len;
     const native_endian = @import("builtin").target.cpu.arch.endian();
@@ -39,6 +73,17 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
         fixed_size: ?usize,
         fixed_end: usize,
         variable_field_count: usize,
+
+        /// Zig Type definition
+        pub fn getZigType() type {
+            return ZT;
+        }
+
+        /// to be used by parent
+        /// an alignment of struct is max of all fields' alignment
+        pub fn getZigTypeAlignment() usize {
+            return alignment;
+        }
 
         /// public function for consumers
         /// TODO: consider returning *@This(), see BitArray
@@ -340,6 +385,7 @@ pub fn createContainerType(comptime ST: type, comptime ZT: type, hashFn: HashFn)
 }
 
 test "basic ContainerType {x: uint, y:bool}" {
+    std.debug.print("basic ContainerType x: uint, y:bool\n", .{});
     var allocator = std.testing.allocator;
     const UintType = @import("./uint.zig").createUintType(8);
     const uintType = try UintType.init();
@@ -351,11 +397,8 @@ test "basic ContainerType {x: uint, y:bool}" {
         x: UintType,
         y: BooleanType,
     };
-    const ZigType = struct {
-        x: u64,
-        y: bool,
-    };
-    const ContainerType = createContainerType(SszType, ZigType, sha256Hash);
+    const ContainerType = createContainerType(SszType, sha256Hash);
+    const ZigType = ContainerType.getZigType();
     var containerType = try ContainerType.init(allocator, SszType{
         .x = uintType,
         .y = booleanType,
@@ -404,11 +447,8 @@ test "ContainerType with embedded struct" {
         x: UintType,
         y: UintType,
     };
-    const ZigType0 = struct {
-        x: u64,
-        y: u64,
-    };
-    const ContainerType0 = createContainerType(SszType0, ZigType0, sha256Hash);
+    const ContainerType0 = createContainerType(SszType0, sha256Hash);
+    const ZigType0 = ContainerType0.getZigType();
     const containerType0 = try ContainerType0.init(allocator, SszType0{
         .x = uintType,
         .y = uintType,
@@ -419,11 +459,8 @@ test "ContainerType with embedded struct" {
         a: ContainerType0,
         b: ContainerType0,
     };
-    const ZigType1 = struct {
-        a: ZigType0,
-        b: ZigType0,
-    };
-    const ContainerType1 = createContainerType(SszType1, ZigType1, sha256Hash);
+    const ContainerType1 = createContainerType(SszType1, sha256Hash);
+    const ZigType1 = ContainerType1.getZigType();
     var containerType1 = try ContainerType1.init(allocator, SszType1{
         .a = containerType0,
         .b = containerType0,

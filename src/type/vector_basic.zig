@@ -16,7 +16,8 @@ const Parsed = @import("./type.zig").Parsed;
 /// Vector: Ordered fixed-length homogeneous collection, with N values
 /// ST: ssz element type
 /// ZT: zig element type
-pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
+pub fn createVectorBasicType(comptime ST: type) type {
+    const ZT = ST.getZigType();
     const ArrayBasic = @import("./array_basic.zig").withElementTypes(ST, ZT);
     const ParsedResult = Parsed([]ZT);
 
@@ -32,6 +33,15 @@ pub fn createVectorBasicType(comptime ST: type, comptime ZT: type) type {
         max_size: usize,
         // this should always be a multiple of 64 bytes
         block_bytes: []u8,
+
+        /// Zig Type definition
+        pub fn getZigType() type {
+            return []ZT;
+        }
+
+        pub fn getZigTypeAlignment() usize {
+            return @alignOf([]ZT);
+        }
 
         pub fn init(allocator: std.mem.Allocator, element_type: *ST, length: usize) !@This() {
             const elem_byte_length = element_type.byte_length;
@@ -145,7 +155,7 @@ test "deserializeFromBytes" {
 
     // uint of 8 bytes = u64
     const UintType = @import("./uint.zig").createUintType(8);
-    const VectorBasicType = createVectorBasicType(UintType, u64);
+    const VectorBasicType = createVectorBasicType(UintType);
     var uintType = try UintType.init();
     var vectorType = try VectorBasicType.init(allocator, &uintType, 8);
     defer uintType.deinit();
@@ -199,7 +209,7 @@ test "deserializeFromJson" {
 
     // uint of 8 bytes = u64
     const UintType = @import("./uint.zig").createUintType(8);
-    const VectorBasicType = createVectorBasicType(UintType, u64);
+    const VectorBasicType = createVectorBasicType(UintType);
     var uintType = try UintType.init();
     var vectorType = try VectorBasicType.init(allocator, &uintType, 4);
     defer uintType.deinit();

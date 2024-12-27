@@ -15,6 +15,15 @@ pub const BooleanType = struct {
     min_size: usize,
     max_size: usize,
 
+    /// Zig type definition
+    pub fn getZigType() type {
+        return bool;
+    }
+
+    pub fn getZigTypeAlignment() usize {
+        return 1;
+    }
+
     pub fn init() @This() {
         return @This(){ .fixed_size = 1, .byte_len = 1, .items_per_chunk = 32, .min_size = 1, .max_size = 1 };
     }

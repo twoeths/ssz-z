@@ -30,7 +30,7 @@ test "valid test for ListBasicType" {
     // uint of 8 bytes = u64
     const UintType = createUintType(8);
     // TODO
-    const ListBasicType = createListBasicType(UintType, u64);
+    const ListBasicType = createListBasicType(UintType);
     var uintType = try UintType.init();
     var listType = try ListBasicType.init(allocator, &uintType, 128, 128);
     defer uintType.deinit();

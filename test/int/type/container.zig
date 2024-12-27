@@ -15,12 +15,8 @@ test "ContainerType with 2 uints" {
         a: UintType,
         b: UintType,
     };
-    const ZigType = struct {
-        a: u64,
-        b: u64,
-    };
 
-    const ContainerType = createContainerType(SszType, ZigType, sha256Hash);
+    const ContainerType = createContainerType(SszType, sha256Hash);
     var containerType = try ContainerType.init(allocator, SszType{
         .a = uintType,
         .b = uintType,
@@ -63,7 +59,7 @@ test "ContainerType with ListBasicType(uint64, 128) and uint64" {
     var uintType = try UintType.init();
     defer uintType.deinit();
 
-    const ListBasicType = createListBasicType(UintType, u64);
+    const ListBasicType = createListBasicType(UintType);
     var listBasicType = try ListBasicType.init(allocator, &uintType, 128, 128);
     defer listBasicType.deinit();
 
@@ -71,12 +67,8 @@ test "ContainerType with ListBasicType(uint64, 128) and uint64" {
         a: ListBasicType,
         b: UintType,
     };
-    const ZigType = struct {
-        a: []u64,
-        b: u64,
-    };
 
-    const ContainerType = createContainerType(SszType, ZigType, sha256Hash);
+    const ContainerType = createContainerType(SszType, sha256Hash);
     var containerType = try ContainerType.init(allocator, SszType{
         .a = listBasicType,
         .b = uintType,

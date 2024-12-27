@@ -35,6 +35,15 @@ pub fn createBitListType(comptime limit_bits: usize) type {
         block_bytes: BlockBytes,
         mix_in_length_block_bytes: []u8,
 
+        /// Zig Type definition
+        pub fn getZigType() type {
+            return BitArray;
+        }
+
+        pub fn getZigTypeAlignment() usize {
+            return @alignOf(BitArray);
+        }
+
         pub fn init(allocator: std.mem.Allocator, init_capacity: usize) !@This() {
             const limit_bytes = (limit_bits + 7) / 8;
             const max_chunk_count: usize = (limit_bytes + 31) / 32;

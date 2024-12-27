@@ -21,7 +21,8 @@ const Parsed = @import("./type.zig").Parsed;
 /// Array of Composite type:
 /// - Composite types always take at least one chunk
 /// - Composite types are always returned as views
-pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
+pub fn createVectorCompositeType(comptime ST: type) type {
+    const ZT = ST.getZigType();
     const ArrayComposite = @import("./array_composite.zig").withElementTypes(ST, ZT);
     const ParsedResult = Parsed([]ZT);
 
@@ -37,6 +38,15 @@ pub fn createVectorCompositeType(comptime ST: type, comptime ZT: type) type {
         default_len: usize,
         // this should always be a multiple of 64 bytes
         block_bytes: []u8,
+
+        /// Zig Type definition
+        pub fn getZigType() type {
+            return []ZT;
+        }
+
+        pub fn getZigTypeAlignment() usize {
+            return @alignOf([]ZT);
+        }
 
         pub fn init(allocator: std.mem.Allocator, element_type: *ST, length: usize) !@This() {
             const max_chunk_count = length;
@@ -151,7 +161,7 @@ test "fromJson - VectorCompositeType of 4 roots" {
     var byteVectorType = try ByteVectorType.init(allocator, 32);
     defer byteVectorType.deinit();
 
-    const VectorCompositeType = createVectorCompositeType(ByteVectorType, []u8);
+    const VectorCompositeType = createVectorCompositeType(ByteVectorType);
     var vectorCompositeType = try VectorCompositeType.init(allocator, &byteVectorType, 4);
     defer vectorCompositeType.deinit();
     const json =
@@ -189,16 +199,12 @@ test "fromJson - VectorCompositeType of 4 ContainerType({a: uint64Type, b: uint6
         a: UintType,
         b: UintType,
     };
-    const ZigType = struct {
-        a: u64,
-        b: u64,
-    };
 
-    const ContainerType = @import("./container.zig").createContainerType(SszType, ZigType, sha256Hash);
+    const ContainerType = @import("./container.zig").createContainerType(SszType, sha256Hash);
     var containerType = try ContainerType.init(allocator, SszType{ .a = uintType, .b = uintType });
     defer containerType.deinit();
 
-    const VectorCompositeType = createVectorCompositeType(ContainerType, ZigType);
+    const VectorCompositeType = createVectorCompositeType(ContainerType);
     var vectorCompositeType = try VectorCompositeType.init(allocator, &containerType, 4);
     defer vectorCompositeType.deinit();
     const json =
