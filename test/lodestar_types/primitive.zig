@@ -2,24 +2,34 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ssz = @import("ssz");
 
+pub const Boolean = ssz.BooleanType;
+const Byte = ssz.createUintType(1);
+const Bytes4 = ssz.createByteVectorType(4);
+const Bytes8 = ssz.createByteVectorType(8);
+const Bytes20 = ssz.createByteVectorType(20);
+const Bytes32 = ssz.createByteVectorType(32);
+const Bytes48 = ssz.createByteVectorType(48);
+const Bytes96 = ssz.createByteVectorType(96);
 pub const Uint8 = ssz.createUintType(1);
 pub const Uint16 = ssz.createUintType(2);
 pub const Uint32 = ssz.createUintType(4);
 pub const Uint64 = ssz.createUintType(8);
+// TODO: UintBn128, UintBn256
+
 pub const Slot = Uint64;
 pub const Epoch = Uint64;
 pub const CommitteeIndex = Uint64;
-pub const Root = ssz.ByteVectorType;
+pub const Root = Bytes32;
 
 pub const PrimitiveTypes = struct {
     Boolean: ssz.BooleanType,
     Byte: Uint8,
-    Bytes4: ssz.ByteVectorType,
-    Bytes8: ssz.ByteVectorType,
-    Bytes20: ssz.ByteVectorType,
-    Bytes32: ssz.ByteVectorType,
-    Bytes48: ssz.ByteVectorType,
-    Bytes96: ssz.ByteVectorType,
+    Bytes4: Bytes4,
+    Bytes8: Bytes8,
+    Bytes20: Bytes20,
+    Bytes32: Bytes32,
+    Bytes48: Bytes48,
+    Bytes96: Bytes96,
     Uint8: Uint8,
     Uint16: Uint16,
     Uint32: Uint32,
@@ -35,26 +45,26 @@ pub const PrimitiveTypes = struct {
     WithdrawalIndex: Uint64,
     Gwei: Uint64,
     // TODO: Wei
-    Root: ssz.ByteVectorType,
+    Root: Bytes32,
     BlobIndex: Uint64,
-    Version: ssz.ByteVectorType,
-    DomainType: ssz.ByteVectorType,
-    BLSPubkey: ssz.ByteVectorType,
-    BLSSignature: ssz.ByteVectorType,
+    Version: Bytes4,
+    DomainType: Bytes4,
+    BLSPubkey: Bytes48,
+    BLSSignature: Bytes96,
 
     pub fn init(allocator: Allocator) !PrimitiveTypes {
         const uint64 = try Uint64.init();
-        const bytes4 = try ssz.ByteVectorType.init(allocator, 4);
-        const bytes32 = try ssz.ByteVectorType.init(allocator, 32);
-        const bytes48 = try ssz.ByteVectorType.init(allocator, 48);
-        const bytes96 = try ssz.ByteVectorType.init(allocator, 96);
+        const bytes4 = try Bytes4.init(allocator);
+        const bytes32 = try Bytes32.init(allocator);
+        const bytes48 = try Bytes48.init(allocator);
+        const bytes96 = try Bytes96.init(allocator);
 
         return PrimitiveTypes{
             .Boolean = ssz.BooleanType.init(),
             .Byte = try Uint8.init(),
             .Bytes4 = bytes4,
-            .Bytes8 = try ssz.ByteVectorType.init(allocator, 8),
-            .Bytes20 = try ssz.ByteVectorType.init(allocator, 20),
+            .Bytes8 = try Bytes8.init(allocator),
+            .Bytes20 = try Bytes20.init(allocator),
             .Bytes32 = bytes32,
             .Bytes48 = bytes48,
             .Bytes96 = bytes96,
