@@ -82,7 +82,7 @@ test "ListBasicType[u8, 256]" {
 
     // uint of 1 bytes = u8
     const UintType = createUintType(1);
-    const ListBasicType = createListBasicType(UintType, u8);
+    const ListBasicType = createListBasicType(UintType);
     var uintType = try UintType.init();
     var list_type = try ListBasicType.init(allocator, &uintType, 256, 256);
     defer uintType.deinit();

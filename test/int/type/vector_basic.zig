@@ -25,7 +25,7 @@ test "valid test for VectorBasicType" {
 
     // uint of 8 bytes = u64
     const UintType = createUintType(8);
-    const VectorBasicType = createVectorBasicType(UintType, u64);
+    const VectorBasicType = createVectorBasicType(UintType);
     var uintType = try UintType.init();
     var vectorType = try VectorBasicType.init(allocator, &uintType, 8);
     defer uintType.deinit();

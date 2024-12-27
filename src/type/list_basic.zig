@@ -19,8 +19,9 @@ const Parsed = @import("./type.zig").Parsed;
 /// List: ordered variable-length homogeneous collection, limited to N values
 /// ST: ssz element type
 /// ZT: zig element type
-pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
+pub fn createListBasicType(comptime ST: type) type {
     const BlockBytes = ArrayList(u8);
+    const ZT = ST.getZigType();
     const ArrayBasic = @import("./array_basic.zig").withElementTypes(ST, ZT);
     const ParsedResult = Parsed([]ZT);
 
@@ -37,6 +38,15 @@ pub fn createListBasicType(comptime ST: type, comptime ZT: type) type {
         // this should always be a multiple of 64 bytes
         block_bytes: BlockBytes,
         mix_in_length_block_bytes: []u8,
+
+        /// Zig Type definition
+        pub fn getZigType() type {
+            return []ZT;
+        }
+
+        pub fn getZigTypeAlignment() usize {
+            return @alignOf([]ZT);
+        }
 
         /// init_capacity is the initial capacity of elements, not bytes
         pub fn init(allocator: std.mem.Allocator, element_type: *ST, limit: usize, init_capacity: usize) !@This() {
@@ -146,7 +156,7 @@ test "deserializeFromBytes" {
 
     // uint of 8 bytes = u64
     const UintType = @import("./uint.zig").createUintType(8);
-    const ListBasicType = createListBasicType(UintType, u64);
+    const ListBasicType = createListBasicType(UintType);
     var uintType = try UintType.init();
     var listType = try ListBasicType.init(allocator, &uintType, 128, 128);
     defer uintType.deinit();
@@ -204,7 +214,7 @@ test "deserializeFromJson" {
 
     // uint of 8 bytes = u64
     const UintType = @import("./uint.zig").createUintType(8);
-    const ListBasicType = createListBasicType(UintType, u64);
+    const ListBasicType = createListBasicType(UintType);
     var uintType = try UintType.init();
     var listType = try ListBasicType.init(allocator, &uintType, 4, 2);
     defer uintType.deinit();

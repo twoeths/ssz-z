@@ -19,8 +19,9 @@ const Parsed = @import("./type.zig").Parsed;
 /// List: ordered variable-length homogeneous collection, limited to N values
 /// ST: ssz element type
 /// ZT: zig element type
-pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
+pub fn createListCompositeType(comptime ST: type) type {
     const BlockBytes = ArrayList(u8);
+    const ZT = ST.getZigType();
     const ArrayComposite = @import("./array_composite.zig").withElementTypes(ST, ZT);
     const ParsedResult = Parsed([]ZT);
 
@@ -37,6 +38,15 @@ pub fn createListCompositeType(comptime ST: type, comptime ZT: type) type {
         // this should always be a multiple of 64 bytes
         block_bytes: BlockBytes,
         mix_in_length_block_bytes: []u8,
+
+        /// Zig Type definition
+        pub fn getZigType() type {
+            return []ZT;
+        }
+
+        pub fn getZigTypeAlignment() usize {
+            return @alignOf([]ZT);
+        }
 
         /// init_capacity is the initial capacity of elements, not bytes
         pub fn init(allocator: std.mem.Allocator, element_type: *ST, limit: usize, init_capacity: usize) !@This() {
@@ -163,7 +173,7 @@ test "ListCompositeType - element type ByteVectorType" {
     var byteVectorType = try ByteVectorType.init(allocator, 32);
     defer byteVectorType.deinit();
 
-    const ListCompositeType = createListCompositeType(ByteVectorType, []u8);
+    const ListCompositeType = createListCompositeType(ByteVectorType);
     var list = try ListCompositeType.init(allocator, &byteVectorType, 128, 4);
     defer list.deinit();
 
@@ -202,13 +212,9 @@ test "ListCompositeType - element type is ContainerType" {
         b: UintType,
     };
 
-    const ZigContainerType = struct {
-        a: u64,
-        b: u64,
-    };
-
-    const SSZContainerType = @import("./container.zig").createContainerType(SSZElementType, ZigContainerType, sha256Hash);
-    const ListCompositeType = createListCompositeType(SSZContainerType, ZigContainerType);
+    const SSZContainerType = @import("./container.zig").createContainerType(SSZElementType, sha256Hash);
+    const ZigContainerType = SSZContainerType.getZigType();
+    const ListCompositeType = createListCompositeType(SSZContainerType);
 
     const uintType = try UintType.init();
     defer uintType.deinit();
@@ -291,11 +297,10 @@ test "ListCompositeType - element type is ListBasicType" {
 
     const UintType = @import("./uint.zig").createUintType(2);
 
-    const ZigListBasicType = []u16;
+    const SSZListBasicType = @import("./list_basic.zig").createListBasicType(UintType);
+    const ZigListBasicType = SSZListBasicType.getZigType();
 
-    const SSZListBasicType = @import("./list_basic.zig").createListBasicType(UintType, u16);
-
-    const ListCompositeType = createListCompositeType(SSZListBasicType, ZigListBasicType);
+    const ListCompositeType = createListCompositeType(SSZListBasicType);
 
     var uintType = try UintType.init();
     defer uintType.deinit();

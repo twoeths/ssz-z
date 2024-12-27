@@ -26,7 +26,7 @@ test "VectorCompositeType of Root" {
     var byte_vector_type = try ByteVectorType.init(allocator, 32);
     defer byte_vector_type.deinit();
 
-    const VectorCompositeType = createVectorCompositeType(ByteVectorType, []u8);
+    const VectorCompositeType = createVectorCompositeType(ByteVectorType);
     var vector_composite_type = try VectorCompositeType.init(allocator, &byte_vector_type, 4);
     defer vector_composite_type.deinit();
 
@@ -59,19 +59,15 @@ test "VectorCompositeType of Container" {
         a: UintType,
         b: UintType,
     };
-    const ZigType = struct {
-        a: u64,
-        b: u64,
-    };
 
-    const ContainerType = createContainerType(SszType, ZigType, sha256Hash);
+    const ContainerType = createContainerType(SszType, sha256Hash);
     var containerType = try ContainerType.init(allocator, SszType{
         .a = uintType,
         .b = uintType,
     });
     defer containerType.deinit();
 
-    const VectorCompositeType = createVectorCompositeType(ContainerType, ZigType);
+    const VectorCompositeType = createVectorCompositeType(ContainerType);
     var vector_composite_type = try VectorCompositeType.init(allocator, &containerType, 4);
     defer vector_composite_type.deinit();
 

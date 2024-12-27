@@ -31,7 +31,7 @@ test "ListCompositeType - element type ByteVectorType" {
     var byte_vector_type = try ByteVectorType.init(allocator, 32);
     defer byte_vector_type.deinit();
 
-    const ListCompositeType = createListCompositeType(ByteVectorType, []u8);
+    const ListCompositeType = createListCompositeType(ByteVectorType);
     var list = try ListCompositeType.init(allocator, &byte_vector_type, 128, 4);
     defer list.deinit();
 
@@ -68,19 +68,15 @@ test "ListCompositeType - element type Container" {
         a: UintType,
         b: UintType,
     };
-    const ZigType = struct {
-        a: u64,
-        b: u64,
-    };
 
-    const ContainerType = createContainerType(SszType, ZigType, sha256Hash);
+    const ContainerType = createContainerType(SszType, sha256Hash);
     var containerType = try ContainerType.init(allocator, SszType{
         .a = uintType,
         .b = uintType,
     });
     defer containerType.deinit();
 
-    const ListCompositeType = createListCompositeType(ContainerType, ZigType);
+    const ListCompositeType = createListCompositeType(ContainerType);
     var list = try ListCompositeType.init(allocator, &containerType, 128, 4);
     defer list.deinit();
 
@@ -114,11 +110,11 @@ test "ListCompositeType - element type ListBasicType" {
     var u16Type = try UintType.init();
     defer u16Type.deinit();
 
-    const ListBasicType = createListBasicType(UintType, u16);
+    const ListBasicType = createListBasicType(UintType);
     var listBasicType = try ListBasicType.init(allocator, &u16Type, 2, 2);
     defer listBasicType.deinit();
 
-    const ListCompositeType = createListCompositeType(ListBasicType, []u16);
+    const ListCompositeType = createListCompositeType(ListBasicType);
     var listCompositeType = try ListCompositeType.init(allocator, &listBasicType, 2, 2);
     defer listCompositeType.deinit();
 
