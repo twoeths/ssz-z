@@ -36,7 +36,7 @@ pub const BLSPubkey = Bytes48;
 pub const BLSSignature = Bytes96;
 pub const Domain = Bytes32;
 // TODO: implement setBitwiseOR
-// pub const ParticipationFlags = ssz.createUintType(1, true);
+pub const ParticipationFlags = ssz.createUintType(1);
 pub const ExecutionAddress = Bytes20;
 
 pub const PrimitiveTypes = struct {
@@ -73,10 +73,11 @@ pub const PrimitiveTypes = struct {
     BLSPubkey: Bytes48,
     BLSSignature: Bytes96,
     Domain: Bytes32,
-    // TODO: implement setBitwiseOR for ParticipationFlags
+    ParticipationFlags: Uint8,
     ExecutionAddress: Bytes20,
 
     pub fn init(allocator: Allocator) !PrimitiveTypes {
+        const uint8 = try Uint8.init();
         const uint64 = try Uint64.init();
         const bytes4 = try Bytes4.init(allocator);
         const bytes32 = try Bytes32.init(allocator);
@@ -85,14 +86,14 @@ pub const PrimitiveTypes = struct {
 
         return PrimitiveTypes{
             .Boolean = ssz.BooleanType.init(),
-            .Byte = try Uint8.init(),
+            .Byte = uint8,
             .Bytes4 = bytes4,
             .Bytes8 = try Bytes8.init(allocator),
             .Bytes20 = try Bytes20.init(allocator),
             .Bytes32 = bytes32,
             .Bytes48 = bytes48,
             .Bytes96 = bytes96,
-            .Uint8 = try Uint8.init(),
+            .Uint8 = uint8,
             .Uint16 = try Uint16.init(),
             .Uint32 = try Uint32.init(),
             .Uint64 = uint64,
@@ -115,7 +116,7 @@ pub const PrimitiveTypes = struct {
             .BLSPubkey = bytes48,
             .BLSSignature = bytes96,
             .Domain = bytes32,
-            // TODO: ParticipationFlags
+            .ParticipationFlags = uint8,
             .ExecutionAddress = try Bytes20.init(allocator),
         };
     }
@@ -129,7 +130,7 @@ pub const PrimitiveTypes = struct {
         try self.Bytes32.deinit();
         try self.Bytes48.deinit();
         try self.Bytes96.deinit();
-        try self.Uint8.deinit();
+        // try self.Uint8.deinit();
         try self.Uint16.deinit();
         try self.Uint32.deinit();
         try self.Uint64.deinit();
@@ -151,6 +152,7 @@ pub const PrimitiveTypes = struct {
         // BLSPubkey
         // BLSSignature
         // Domain
+        // ParticipationFlags
         // ExecutionAddress
     }
 };
