@@ -14,12 +14,30 @@ pub const Uint8 = ssz.createUintType(1);
 pub const Uint16 = ssz.createUintType(2);
 pub const Uint32 = ssz.createUintType(4);
 pub const Uint64 = ssz.createUintType(8);
-// TODO: UintBn128, UintBn256
+pub const Uint128 = ssz.createUintType(16);
+pub const Uint256 = ssz.createUintType(32);
 
 pub const Slot = Uint64;
 pub const Epoch = Uint64;
+pub const SyncPeriod = Uint64;
 pub const CommitteeIndex = Uint64;
+pub const SubcommitteeIndex = Uint64;
+pub const ValidatorIndex = Uint64;
+pub const WithdrawalIndex = Uint64;
+pub const Gwei = Uint64;
+pub const Wei = Uint256;
 pub const Root = Bytes32;
+pub const BlobIndex = Uint64;
+
+pub const Version = Bytes4;
+pub const DomainType = Bytes4;
+pub const ForkDigest = Bytes4;
+pub const BLSPubkey = Bytes48;
+pub const BLSSignature = Bytes96;
+pub const Domain = Bytes32;
+// TODO: implement setBitwiseOR
+// pub const ParticipationFlags = ssz.createUintType(1, true);
+pub const ExecutionAddress = Bytes20;
 
 pub const PrimitiveTypes = struct {
     Boolean: ssz.BooleanType,
@@ -34,6 +52,8 @@ pub const PrimitiveTypes = struct {
     Uint16: Uint16,
     Uint32: Uint32,
     Uint64: Uint64,
+    Uint128: Uint128,
+    Uint256: Uint256,
     /// Slot is a time unit, so in all usages it's bounded by the clock, ensuring < 2**53-1
     Slot: Uint64,
     /// Epoch is a time unit, so in all usages it's bounded by the clock, ensuring < 2**53-1
@@ -44,13 +64,17 @@ pub const PrimitiveTypes = struct {
     ValidatorIndex: Uint64,
     WithdrawalIndex: Uint64,
     Gwei: Uint64,
-    // TODO: Wei
+    Wei: Uint256,
     Root: Bytes32,
     BlobIndex: Uint64,
     Version: Bytes4,
     DomainType: Bytes4,
+    ForkDigest: Bytes4,
     BLSPubkey: Bytes48,
     BLSSignature: Bytes96,
+    Domain: Bytes32,
+    // TODO: implement setBitwiseOR for ParticipationFlags
+    ExecutionAddress: Bytes20,
 
     pub fn init(allocator: Allocator) !PrimitiveTypes {
         const uint64 = try Uint64.init();
@@ -72,20 +96,27 @@ pub const PrimitiveTypes = struct {
             .Uint16 = try Uint16.init(),
             .Uint32 = try Uint32.init(),
             .Uint64 = uint64,
+            .Uint128 = try Uint128.init(),
+            .Uint256 = try Uint256.init(),
             .Slot = uint64,
             .Epoch = uint64,
+            .SyncPeriod = uint64,
             .CommitteeIndex = uint64,
             .SubcommitteeIndex = uint64,
             .ValidatorIndex = uint64,
             .WithdrawalIndex = uint64,
             .Gwei = uint64,
-            .SyncPeriod = uint64,
+            .Wei = try Uint256.init(),
             .Root = bytes32,
             .BlobIndex = uint64,
             .Version = bytes4,
             .DomainType = bytes4,
+            .ForkDigest = bytes4,
             .BLSPubkey = bytes48,
             .BLSSignature = bytes96,
+            .Domain = bytes32,
+            // TODO: ParticipationFlags
+            .ExecutionAddress = try Bytes20.init(allocator),
         };
     }
 
@@ -105,9 +136,22 @@ pub const PrimitiveTypes = struct {
         // below are alias types so no need to deinit
         // Slot
         // Epoch
+        // SyncPeriod
+        // CommitteeIndex
+        // SubcommitteeIndex
+        // ValidatorIndex
+        // WithdrawalIndex
+        // Gwei
+        try self.Wei.deinit();
         // Root
+        // BlobIndex
+        // Version
+        // DomainType
+        // ForkDigest
         // BLSPubkey
         // BLSSignature
+        // Domain
+        // ExecutionAddress
     }
 };
 
