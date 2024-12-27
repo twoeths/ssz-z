@@ -43,6 +43,8 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
         };
     }
 
+    // this works for Zig 0.13
+    // syntax in 0.14 or later could change, see https://github.com/ziglang/zig/issues/10710
     const ZT = comptime @Type(.{
         .Struct = .{
             .layout = .auto,
