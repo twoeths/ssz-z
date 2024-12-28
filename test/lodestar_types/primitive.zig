@@ -3,13 +3,13 @@ const Allocator = std.mem.Allocator;
 const ssz = @import("ssz");
 
 pub const Boolean = ssz.BooleanType;
-const Byte = ssz.createUintType(1);
-const Bytes4 = ssz.createByteVectorType(4);
-const Bytes8 = ssz.createByteVectorType(8);
-const Bytes20 = ssz.createByteVectorType(20);
-const Bytes32 = ssz.createByteVectorType(32);
-const Bytes48 = ssz.createByteVectorType(48);
-const Bytes96 = ssz.createByteVectorType(96);
+pub const Byte = ssz.createUintType(1);
+pub const Bytes4 = ssz.createByteVectorType(4);
+pub const Bytes8 = ssz.createByteVectorType(8);
+pub const Bytes20 = ssz.createByteVectorType(20);
+pub const Bytes32 = ssz.createByteVectorType(32);
+pub const Bytes48 = ssz.createByteVectorType(48);
+pub const Bytes96 = ssz.createByteVectorType(96);
 pub const Uint8 = ssz.createUintType(1);
 pub const Uint16 = ssz.createUintType(2);
 pub const Uint32 = ssz.createUintType(4);
@@ -160,7 +160,8 @@ pub const PrimitiveTypes = struct {
 // Thread-local instance of `?PrimitiveTypes`
 threadlocal var instance: ?PrimitiveTypes = null;
 
-pub fn getPrimitiveTypes(allocator: Allocator) !*const PrimitiveTypes {
+/// can not return *const PrimitiveTypes because ssz types's hash block are modified
+pub fn getPrimitiveTypes(allocator: Allocator) !*PrimitiveTypes {
     if (instance == null) {
         instance = try PrimitiveTypes.init(allocator);
     }
