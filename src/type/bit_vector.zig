@@ -61,7 +61,7 @@ pub fn createBitVectorType(comptime length_bits: usize) type {
             const fixed_size = length_bytes;
             const min_size = fixed_size;
             const max_size = fixed_size;
-            const zero_bit_mask: u8 = if (length_bits % 8 == 0) 0 else @as(u8, 0xff << (length_bits % 8));
+            const zero_bit_mask: u8 = if (length_bits % 8 == 0) 0 else @as(u8, @as(u8, 0xff) << (length_bits % 8));
             const block_bytes_len = ((max_chunk_count + 1) / 2) * 64;
 
             return @This(){
