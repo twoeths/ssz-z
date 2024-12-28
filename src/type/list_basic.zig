@@ -27,7 +27,7 @@ pub fn createListBasicType(comptime ST: type) type {
 
     const ListBasicType = struct {
         allocator: std.mem.Allocator,
-        element_type: *ST,
+        element_type: *const ST,
         limit: usize,
         fixed_size: ?usize,
         depth: usize,
@@ -49,7 +49,7 @@ pub fn createListBasicType(comptime ST: type) type {
         }
 
         /// init_capacity is the initial capacity of elements, not bytes
-        pub fn init(allocator: std.mem.Allocator, element_type: *ST, limit: usize, init_capacity: usize) !@This() {
+        pub fn init(allocator: std.mem.Allocator, element_type: *const ST, limit: usize, init_capacity: usize) !@This() {
             const elem_byte_length = element_type.byte_length;
             const init_capacity_bytes = init_capacity * elem_byte_length;
             const max_chunk_count = (limit * elem_byte_length + 31) / 32;

@@ -27,7 +27,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return Array.clone(self, value);
         }
 
-        pub fn serializeToBytes(element_type: *ST, value: []const ZT, out: []u8) !usize {
+        pub fn serializeToBytes(element_type: *const ST, value: []const ZT, out: []u8) !usize {
             const elem_byte_length = element_type.byte_length;
             const byte_len = elem_byte_length * value.len;
 
@@ -40,7 +40,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return byte_len;
         }
 
-        pub fn deserializeFromBytes(element_type: *ST, data: []const u8, out: []ZT) JsonError!void {
+        pub fn deserializeFromBytes(element_type: *const ST, data: []const u8, out: []ZT) JsonError!void {
             const elem_byte_length = element_type.byte_length;
             if (data.len % elem_byte_length != 0) {
                 return error.InCorrectLen;
@@ -58,7 +58,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
 
         /// consumer need to free the memory
         /// out parameter is unused because it's always allocated inside the function
-        pub fn deserializeFromSlice(arenaAllocator: Allocator, element_type: *ST, data: []const u8, expected_len: ?usize, _: ?[]ZT) SszError![]ZT {
+        pub fn deserializeFromSlice(arenaAllocator: Allocator, element_type: *const ST, data: []const u8, expected_len: ?usize, _: ?[]ZT) SszError![]ZT {
             const elem_byte_length = element_type.byte_length;
             if (data.len % elem_byte_length != 0) {
                 return error.InCorrectLen;
@@ -81,7 +81,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
 
         /// consumer need to free the memory
         /// out parameter is unused because it's always allocated inside the function
-        pub fn deserializeFromJson(arena_allocator: Allocator, element_type: *ST, source: *Scanner, expected_len: ?usize, _: ?[]ZT) ![]ZT {
+        pub fn deserializeFromJson(arena_allocator: Allocator, element_type: *const ST, source: *Scanner, expected_len: ?usize, _: ?[]ZT) ![]ZT {
             // validate start array token "["
             const start_array_token = try source.next();
             if (start_array_token != Token.array_begin) {
@@ -115,11 +115,11 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return arraylist.toOwnedSlice();
         }
 
-        pub fn itemEquals(element_type: *ST, a: []const ZT, b: []const ZT) bool {
+        pub fn itemEquals(element_type: *const ST, a: []const ZT, b: []const ZT) bool {
             return Array.itemEquals(element_type, a, b);
         }
 
-        pub fn itemClone(element_type: *ST, arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+        pub fn itemClone(element_type: *const ST, arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
             return Array.itemClone(element_type, arena_allocator, value, out);
         }
     };

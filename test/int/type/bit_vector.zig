@@ -4,7 +4,7 @@ const fromHex = @import("util").fromHex;
 const initZeroHash = @import("hash").initZeroHash;
 const deinitZeroHash = @import("hash").deinitZeroHash;
 const TestCase = @import("common.zig").TypeTestCase;
-const BitVectorType = @import("ssz").BitVectorType;
+const createBitVectorType = @import("ssz").createBitVectorType;
 
 test "BitVectorType of 128 bytes" {
     const testCases = [_]TestCase{
@@ -25,7 +25,8 @@ test "BitVectorType of 128 bytes" {
     try initZeroHash(&allocator, 32);
     defer deinitZeroHash();
 
-    var bitVectorType = try BitVectorType.init(allocator, 128);
+    const BitVectorType = createBitVectorType(128);
+    var bitVectorType = try BitVectorType.init(allocator);
     defer bitVectorType.deinit();
 
     const TypeTest = @import("common.zig").typeTest(BitVectorType);
@@ -61,7 +62,8 @@ test "BitVectorType of 512 bytes" {
     try initZeroHash(&allocator, 32);
     defer deinitZeroHash();
 
-    var bitVectorType = try BitVectorType.init(allocator, 512);
+    const BitVectorType = createBitVectorType(512);
+    var bitVectorType = try BitVectorType.init(allocator);
     defer bitVectorType.deinit();
 
     const TypeTest = @import("common.zig").typeTest(BitVectorType);

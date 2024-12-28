@@ -44,7 +44,7 @@ pub fn withElementTypes(comptime ST: type, comptime ZT: type) type {
             return true;
         }
 
-        pub fn itemClone(element_type: *ST, arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
+        pub fn itemClone(element_type: *const ST, arena_allocator: Allocator, value: []const ZT, out: ?[]ZT) ![]ZT {
             const out2 = out orelse try arena_allocator.alloc(ZT, value.len);
             if (out2.len != value.len) {
                 return error.InCorrectLen;
