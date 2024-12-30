@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const lib = b.addStaticLibrary(.{
-        .name = "ssz-z",
+        .name = "ssz",
         // In this case the main source file is merely a path, however, in more
         // complicated build scripts, this could be a generated file.
         .root_source_file = b.path("src/root.zig"),
@@ -24,18 +24,18 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const util_module = b.createModule(.{
-        .root_source_file = b.path("lib/hex.zig"),
+    const common_module = b.createModule(.{
+        .root_source_file = b.path("../common/src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
     const hash_module = b.createModule(.{
-        .root_source_file = b.path("src/hash/merkleize.zig"),
+        .root_source_file = b.path("../persistent-merkle-tree/src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    lib.root_module.addImport("util", util_module);
+    lib.root_module.addImport("util", common_module);
     lib.root_module.addImport("hash", hash_module);
 
     // This declares intent for the library to be installed into the standard
@@ -44,7 +44,7 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(lib);
 
     const exe = b.addExecutable(.{
-        .name = "ssz-z",
+        .name = "ssz",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
@@ -55,7 +55,7 @@ pub fn build(b: *std.Build) void {
     // step when running `zig build`).
     b.installArtifact(exe);
 
-    exe.root_module.addImport("util", util_module);
+    exe.root_module.addImport("util", common_module);
     exe.root_module.addImport("hash", hash_module);
 
     // This *creates* a Run step in the build graph, to be executed when another
@@ -89,7 +89,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    lib_unit_tests.root_module.addImport("util", util_module);
+    lib_unit_tests.root_module.addImport("util", common_module);
     lib_unit_tests.root_module.addImport("hash", hash_module);
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
@@ -99,12 +99,12 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    ssz_module.addImport("util", util_module);
+    ssz_module.addImport("util", common_module);
     ssz_module.addImport("hash", hash_module);
 
     // Similar to the run step above, this creates a test step in test folder
-    const run_lib_unit_valid_tests = addIntTest(b, target, optimize, util_module, hash_module, ssz_module);
-    const run_lodestar_tests = addLodestarTest(b, target, optimize, util_module, hash_module, ssz_module);
+    const run_lib_unit_valid_tests = addIntTest(b, target, optimize, common_module, hash_module, ssz_module);
+    const run_lodestar_tests = addLodestarTest(b, target, optimize, common_module, hash_module, ssz_module);
 
     const exe_unit_tests = b.addTest(.{
         .root_source_file = b.path("src/main.zig"),
@@ -112,7 +112,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    exe_unit_tests.root_module.addImport("util", util_module);
+    exe_unit_tests.root_module.addImport("util", common_module);
     exe_unit_tests.root_module.addImport("hash", hash_module);
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
@@ -132,15 +132,15 @@ pub fn build(b: *std.Build) void {
     lodestar_test_step.dependOn(&run_lodestar_tests.step);
 }
 
-fn addIntTest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, util_module: *std.Build.Module, hash_module: *std.Build.Module, ssz_module: *std.Build.Module) *std.Build.Step.Run {
-    return addTest("test/int/root.zig", b, target, optimize, util_module, hash_module, ssz_module);
+fn addIntTest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, common_module: *std.Build.Module, hash_module: *std.Build.Module, ssz_module: *std.Build.Module) *std.Build.Step.Run {
+    return addTest("test/int/root.zig", b, target, optimize, common_module, hash_module, ssz_module);
 }
 
-fn addLodestarTest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, util_module: *std.Build.Module, hash_module: *std.Build.Module, ssz_module: *std.Build.Module) *std.Build.Step.Run {
-    return addTest("test/lodestar_types/root.zig", b, target, optimize, util_module, hash_module, ssz_module);
+fn addLodestarTest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, common_module: *std.Build.Module, hash_module: *std.Build.Module, ssz_module: *std.Build.Module) *std.Build.Step.Run {
+    return addTest("test/lodestar_types/root.zig", b, target, optimize, common_module, hash_module, ssz_module);
 }
 
-fn addTest(root_path: []const u8, b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, util_module: *std.Build.Module, hash_module: *std.Build.Module, ssz_module: *std.Build.Module) *std.Build.Step.Run {
+fn addTest(root_path: []const u8, b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, common_module: *std.Build.Module, hash_module: *std.Build.Module, ssz_module: *std.Build.Module) *std.Build.Step.Run {
     // Similar to the run step above, this creates a test step in test folder
     const lib_unit_valid_tests = b.addTest(.{
         .root_source_file = b.path(root_path),
@@ -150,7 +150,7 @@ fn addTest(root_path: []const u8, b: *std.Build, target: std.Build.ResolvedTarge
         .optimize = optimize,
     });
 
-    lib_unit_valid_tests.root_module.addImport("util", util_module);
+    lib_unit_valid_tests.root_module.addImport("util", common_module);
     lib_unit_valid_tests.root_module.addImport("hash", hash_module);
     lib_unit_valid_tests.root_module.addImport("ssz", ssz_module);
 
