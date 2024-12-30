@@ -25,12 +25,12 @@ pub fn build(b: *std.Build) void {
     });
 
     const util_module = b.createModule(.{
-        .root_source_file = b.path("lib/hex.zig"),
+        .root_source_file = b.path("../common/hex.zig"),
         .target = target,
         .optimize = optimize,
     });
     const hash_module = b.createModule(.{
-        .root_source_file = b.path("src/hash/merkleize.zig"),
+        .root_source_file = b.path("../persistent-merkle-tree/src/merkleize.zig"),
         .target = target,
         .optimize = optimize,
     });
