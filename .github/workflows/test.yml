@@ -21,20 +21,20 @@ jobs:
         with:
           version: "0.13.0" # Set the required Zig version
 
-      - name: persistent-merkle-tree - build and unit Test
+      - name: persistent-merkle-tree - build and unit test
         working-directory: packages/persistent-merkle-tree
         run: |
           zig build test:unit
 
-      - name: ssz - build and unit Test
+      - name: ssz - build and unit test
         working-directory: packages/ssz
         run: |
           zig build test:unit
-      - name: ssz - lodestar Test
+      - name: ssz - lodestar test
         working-directory: packages/ssz
         run: |
           zig build test:lodestar
-      - name: ssz - build and integration Test
+      - name: ssz - build and integration test
         working-directory: packages/ssz
         run: |
           zig build test:int
