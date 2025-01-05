@@ -10,6 +10,7 @@ pub const getZeroHash = zero_hash.getZeroHash;
 pub const deinitZeroHash = zero_hash.deinitZeroHash;
 pub const sha256Hash = @import("./sha256.zig").sha256Hash;
 pub const HashError = @import("./sha256.zig").HashError;
+pub const NodePool = @import("./tree.zig").NodePool;
 
 test {
     testing.refAllDecls(@This());
