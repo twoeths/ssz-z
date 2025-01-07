@@ -2,10 +2,10 @@ const std = @import("std");
 const digest64Into = @import("./sha256.zig").digest64Into;
 
 pub const ZeroHash = struct {
-    allocator: *std.mem.Allocator,
+    allocator: *const std.mem.Allocator,
     zero_hashes: []?[32]u8,
 
-    pub fn init(allocator: *std.mem.Allocator, max_depth: usize) !ZeroHash {
+    pub fn init(allocator: *const std.mem.Allocator, max_depth: usize) !ZeroHash {
         var hashes = try allocator.alloc(?[32]u8, max_depth + 1);
         // Use indexing to assign `null` to each element
         for (0..hashes.len) |i| {
@@ -41,7 +41,7 @@ pub const ZeroHash = struct {
 // Thread-local instance of `?ZeroHash`
 threadlocal var instance: ?ZeroHash = null;
 
-pub fn initZeroHash(allocator: *std.mem.Allocator, max_depth: usize) !void {
+pub fn initZeroHash(allocator: *const std.mem.Allocator, max_depth: usize) !void {
     if (instance == null) {
         instance = try ZeroHash.init(allocator, max_depth);
     }
