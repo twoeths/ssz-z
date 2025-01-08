@@ -74,6 +74,7 @@ pub const NodePool = struct {
         return node;
     }
 
+    /// cannot make left and right as const since we may modify its ref_count
     pub fn newBranch(self: *NodePool, left: *Node, right: *Node) !*Node {
         const nodeOrNull = self.branch_nodes.popOrNull();
         if (nodeOrNull) |node| {

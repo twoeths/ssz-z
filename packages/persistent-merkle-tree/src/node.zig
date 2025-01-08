@@ -133,6 +133,20 @@ pub fn getRoot(node: *Node) *const [32]u8 {
     }
 }
 
+pub fn getLeft(node: *Node) !*Node {
+    switch (node.*) {
+        .Branch => return node.Branch.left,
+        else => return error.NoLeft,
+    }
+}
+
+pub fn getRight(node: *Node) !*Node {
+    switch (node.*) {
+        .Branch => return node.Branch.right,
+        else => return error.NoRight,
+    }
+}
+
 pub fn incRefCount(node: *Node) void {
     switch (node.*) {
         .Leaf => node.Leaf.ref_count += 1,

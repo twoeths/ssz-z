@@ -11,6 +11,7 @@ pub const deinitZeroHash = zero_hash.deinitZeroHash;
 pub const sha256Hash = @import("./sha256.zig").sha256Hash;
 pub const HashError = @import("./sha256.zig").HashError;
 pub const NodePool = @import("./pool.zig").NodePool;
+pub const setNodesAtDepth = @import("./tree.zig").setNodesAtDepth;
 
 test {
     testing.refAllDecls(@This());
