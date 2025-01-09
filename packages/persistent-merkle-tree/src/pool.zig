@@ -33,7 +33,8 @@ pub const NodePool = struct {
         const zero_list = try arena_allocator.alloc(*Node, MAX_NODES_DEPTH);
         try zh.initZeroHash(&arena_allocator, MAX_NODES_DEPTH);
         for (0..MAX_NODES_DEPTH) |i| {
-            zero_list[i] = try nm.initZeroNode(arena_allocator, try zh.getZeroHash(i));
+            const prev_zero = if (i == 0) null else zero_list[i - 1];
+            zero_list[i] = try nm.initZeroNode(arena_allocator, try zh.getZeroHash(i), prev_zero, prev_zero);
         }
         return NodePool{
             .leaf_nodes = try LeafList.initCapacity(arena_allocator, capacity),

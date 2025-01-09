@@ -87,15 +87,21 @@ pub const LeafNode = struct {
     }
 };
 
+/// if level 0, it's a leaf node without ref count
+/// from level 1, it's the BranchNode with no ref count
 pub const ZeroNode = struct {
-    // the same to LeafNode with no ref count
     hash: *const [32]u8,
+    // these are ZeroNode but want to conform to get* function signature
+    left: ?*Node,
+    right: ?*Node,
 
     // called and managed by NodePool
-    pub fn init(allocator: Allocator, hash: *const [32]u8) !*ZeroNode {
+    pub fn init(allocator: Allocator, hash: *const [32]u8, left: ?*Node, right: ?*Node) !*ZeroNode {
         const zero = try allocator.create(ZeroNode);
         // no need to copy because the input hash is zero_hash which is allocated by the same allocator
         zero.hash = hash;
+        zero.left = left;
+        zero.right = right;
         return zero;
     }
 
@@ -118,8 +124,8 @@ pub fn initLeafNode(allocator: Allocator, hash: *const [32]u8) !*Node {
     return node;
 }
 
-pub fn initZeroNode(allocator: Allocator, hash: *const [32]u8) !*Node {
-    const zero = try ZeroNode.init(allocator, hash);
+pub fn initZeroNode(allocator: Allocator, hash: *const [32]u8, left: ?*Node, right: ?*Node) !*Node {
+    const zero = try ZeroNode.init(allocator, hash, left, right);
     const node = try allocator.create(Node);
     node.* = Node{ .Zero = zero.* };
     return node;
@@ -136,6 +142,7 @@ pub fn getRoot(node: *Node) *const [32]u8 {
 pub fn getLeft(node: *Node) !*Node {
     switch (node.*) {
         .Branch => return node.Branch.left,
+        .Zero => return node.Zero.left orelse return error.NoLeft,
         else => return error.NoLeft,
     }
 }
@@ -143,6 +150,7 @@ pub fn getLeft(node: *Node) !*Node {
 pub fn getRight(node: *Node) !*Node {
     switch (node.*) {
         .Branch => return node.Branch.right,
+        .Zero => return node.Zero.right orelse return error.NoRight,
         else => return error.NoRight,
     }
 }
