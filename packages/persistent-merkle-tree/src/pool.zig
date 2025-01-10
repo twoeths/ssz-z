@@ -19,29 +19,24 @@ pub const NodePool = struct {
     zero_list: []*Node,
     // no need to call destroyNode() on this
     place_holder: *Node,
-    arena: *ArenaAllocator,
     allocator: Allocator,
     // these variables are useful for metrics and tests
     branch_node_count: usize,
     leaf_node_count: usize,
 
     pub fn init(allocator: Allocator, capacity: usize) !NodePool {
-        const arena = try allocator.create(ArenaAllocator);
-        arena.* = ArenaAllocator.init(allocator);
-        const arena_allocator = arena.allocator();
-        const place_holder = try nm.initLeafNode(arena_allocator, &[_]u8{0} ** 32);
-        const zero_list = try arena_allocator.alloc(*Node, MAX_NODES_DEPTH);
-        try zh.initZeroHash(&arena_allocator, MAX_NODES_DEPTH);
+        const place_holder = try nm.initLeafNode(allocator, &[_]u8{0} ** 32);
+        const zero_list = try allocator.alloc(*Node, MAX_NODES_DEPTH);
+        try zh.initZeroHash(&allocator, MAX_NODES_DEPTH);
         for (0..MAX_NODES_DEPTH) |i| {
             const prev_zero = if (i == 0) null else zero_list[i - 1];
-            zero_list[i] = try nm.initZeroNode(arena_allocator, try zh.getZeroHash(i), prev_zero, prev_zero);
+            zero_list[i] = try nm.initZeroNode(allocator, try zh.getZeroHash(i), prev_zero, prev_zero);
         }
         return NodePool{
-            .leaf_nodes = try LeafList.initCapacity(arena_allocator, capacity),
-            .branch_nodes = try BranchList.initCapacity(arena_allocator, capacity),
+            .leaf_nodes = try LeafList.initCapacity(allocator, capacity),
+            .branch_nodes = try BranchList.initCapacity(allocator, capacity),
             .zero_list = zero_list,
             .place_holder = place_holder,
-            .arena = arena,
             .allocator = allocator,
             .branch_node_count = 0,
             .leaf_node_count = 0,
@@ -49,10 +44,26 @@ pub const NodePool = struct {
     }
 
     pub fn deinit(self: *NodePool) void {
+        for (self.leaf_nodes.items) |node| {
+            nm.destroyNode(self.allocator, node);
+        }
         self.leaf_nodes.deinit();
+
+        for (self.branch_nodes.items) |node| {
+            nm.destroyNode(self.allocator, node);
+        }
         self.branch_nodes.deinit();
-        self.arena.deinit();
-        self.allocator.destroy(self.arena);
+
+        for (self.zero_list) |node| {
+            nm.destroyNode(self.allocator, node);
+        }
+
+        self.allocator.free(self.zero_list);
+
+        nm.destroyNode(self.allocator, self.place_holder);
+
+        // TODO: segmentation fault or zero_hash leaked
+        // zh.deinitZeroHash();
     }
 
     pub fn newLeaf(self: *NodePool, hash: *const [32]u8) !*Node {
@@ -70,7 +81,7 @@ pub const NodePool = struct {
         }
 
         // create new
-        const node = try nm.initLeafNode(self.arena.allocator(), hash);
+        const node = try nm.initLeafNode(self.allocator, hash);
         self.leaf_node_count += 1;
         return node;
     }
@@ -96,7 +107,7 @@ pub const NodePool = struct {
         }
 
         // create new
-        const node = try nm.initBranchNode(self.arena.allocator(), left, right);
+        const node = try nm.initBranchNode(self.allocator, left, right);
         self.branch_node_count += 1;
         return node;
     }
@@ -108,7 +119,7 @@ pub const NodePool = struct {
         return self.zero_list[depth];
     }
 
-    pub fn destroyNode(self: *NodePool, node: *Node) !void {
+    pub fn unref(self: *NodePool, node: *Node) !void {
         switch (node.*) {
             .Leaf => {
                 const leaf = &node.Leaf;
@@ -122,8 +133,8 @@ pub const NodePool = struct {
                 const branch = &node.Branch;
                 branch.decRefCount();
                 if (branch.ref_count == 0) {
-                    try self.destroyNode(branch.left);
-                    try self.destroyNode(branch.right);
+                    try self.unref(branch.left);
+                    try self.unref(branch.right);
                     try self.branch_nodes.append(node);
                     @memset(branch.hash.*[0..], 0);
                     branch.left = self.place_holder;
@@ -164,14 +175,14 @@ test "recreate the same tree" {
     var rootNode2 = try pool.newBranch(branch1, branch2);
 
     // destroy tree1, only rootNode is released to pool
-    try pool.destroyNode(rootNode);
+    try pool.unref(rootNode);
     try expect(pool.leaf_nodes.items.len == 0);
     try expect(pool.branch_nodes.items.len == 1);
     try expect(pool.leaf_node_count == 4);
     try expect(pool.branch_node_count == 4);
 
     // also destroy tree 2, all nodes are released to pool
-    try pool.destroyNode(rootNode2);
+    try pool.unref(rootNode2);
     try expect(pool.leaf_nodes.items.len == 4);
     try expect(pool.branch_nodes.items.len == 4);
     try expect(pool.leaf_node_count == 4);
@@ -204,4 +215,8 @@ test "recreate the same tree" {
     // hash should be the same
     const new_root = nm.getRoot(rootNode);
     try std.testing.expectEqualSlices(u8, expected_root[0..], new_root.*[0..]);
+
+    // cleanup
+    try pool.unref(rootNode);
+    try pool.unref(rootNode2);
 }

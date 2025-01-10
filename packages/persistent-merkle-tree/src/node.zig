@@ -23,16 +23,18 @@ pub const BranchNode = struct {
     ref_count: usize,
 
     // called and managed by NodePool
-    pub fn init(allocator: Allocator, left: *Node, right: *Node) !*BranchNode {
-        const branch = try allocator.create(BranchNode);
-        branch.hash = try allocator.create([32]u8);
-        branch.left = left;
-        branch.right = right;
-        branch.hash_computed = false;
-        branch.ref_count = 0;
+    pub fn init(allocator: Allocator, left: *Node, right: *Node) !*Node {
+        const node = try allocator.create(Node);
+        node.* = Node{ .Branch = .{
+            .hash = try allocator.create([32]u8),
+            .hash_computed = false,
+            .left = left,
+            .right = right,
+            .ref_count = 0,
+        } };
         incRefCount(left);
         incRefCount(right);
-        return branch;
+        return node;
     }
 
     // NodePool will deinit in batch
@@ -63,12 +65,17 @@ pub const LeafNode = struct {
     ref_count: usize,
 
     // called and managed by NodePool
-    pub fn init(allocator: Allocator, hash: *const [32]u8) !*LeafNode {
-        const leaf = try allocator.create(LeafNode);
-        leaf.hash = try allocator.create([32]u8);
+    pub fn init(allocator: Allocator, hash: *const [32]u8) !*Node {
+        const node = try allocator.create(Node);
+
+        const leaf: LeafNode = .{
+            .hash = try allocator.create([32]u8),
+            .ref_count = 0,
+        };
+
         @memcpy(leaf.hash.*[0..], hash.*[0..]);
-        leaf.ref_count = 0;
-        return leaf;
+        node.* = Node{ .Leaf = leaf };
+        return node;
     }
 
     // NodePool will deinit in batch
@@ -96,13 +103,17 @@ pub const ZeroNode = struct {
     right: ?*Node,
 
     // called and managed by NodePool
-    pub fn init(allocator: Allocator, zero_hash: *const [32]u8, left: ?*Node, right: ?*Node) !*ZeroNode {
-        const zero = try allocator.create(ZeroNode);
-        zero.hash = try allocator.create([32]u8);
+    pub fn init(allocator: Allocator, zero_hash: *const [32]u8, left: ?*Node, right: ?*Node) !*Node {
+        const node = try allocator.create(Node);
+        const zero: ZeroNode = .{
+            .hash = try allocator.create([32]u8),
+            .left = left,
+            .right = right,
+        };
+
         @memcpy(zero.hash.*[0..], zero_hash.*[0..]);
-        zero.left = left;
-        zero.right = right;
-        return zero;
+        node.* = Node{ .Zero = zero };
+        return node;
     }
 
     pub fn root(self: *LeafNode) *const [32]u8 {
@@ -111,24 +122,25 @@ pub const ZeroNode = struct {
 };
 
 pub fn initBranchNode(allocator: Allocator, left: *Node, right: *Node) !*Node {
-    const branch = try BranchNode.init(allocator, left, right);
-    const node = try allocator.create(Node);
-    node.* = Node{ .Branch = branch.* };
-    return node;
+    return BranchNode.init(allocator, left, right);
 }
 
 pub fn initLeafNode(allocator: Allocator, hash: *const [32]u8) !*Node {
-    const leaf = try LeafNode.init(allocator, hash);
-    const node = try allocator.create(Node);
-    node.* = Node{ .Leaf = leaf.* };
-    return node;
+    return LeafNode.init(allocator, hash);
 }
 
 pub fn initZeroNode(allocator: Allocator, hash: *const [32]u8, left: ?*Node, right: ?*Node) !*Node {
-    const zero = try ZeroNode.init(allocator, hash, left, right);
-    const node = try allocator.create(Node);
-    node.* = Node{ .Zero = zero.* };
-    return node;
+    return ZeroNode.init(allocator, hash, left, right);
+}
+
+/// all nodes are returned to pool before calling this on each node
+pub fn destroyNode(allocator: Allocator, node: *Node) void {
+    switch (node.*) {
+        .Branch => allocator.destroy(node.Branch.hash),
+        .Leaf => allocator.destroy(node.Leaf.hash),
+        .Zero => allocator.destroy(node.Zero.hash),
+    }
+    allocator.destroy(node);
 }
 
 pub fn getRoot(node: *Node) *const [32]u8 {
