@@ -28,6 +28,8 @@ pub const NodePool = struct {
         const place_holder = try nm.initLeafNode(allocator, &[_]u8{0} ** 32);
         const zero_list = try allocator.alloc(*Node, MAX_NODES_DEPTH);
         try zh.initZeroHash(&allocator, MAX_NODES_DEPTH);
+        // TODO: somehow put this in deinit() causes segmentation fault
+        defer zh.deinitZeroHash();
         for (0..MAX_NODES_DEPTH) |i| {
             const prev_zero = if (i == 0) null else zero_list[i - 1];
             zero_list[i] = try nm.initZeroNode(allocator, try zh.getZeroHash(i), prev_zero, prev_zero);
@@ -61,9 +63,6 @@ pub const NodePool = struct {
         self.allocator.free(self.zero_list);
 
         nm.destroyNode(self.allocator, self.place_holder);
-
-        // TODO: segmentation fault or zero_hash leaked
-        // zh.deinitZeroHash();
     }
 
     pub fn newLeaf(self: *NodePool, hash: *const [32]u8) !*Node {
