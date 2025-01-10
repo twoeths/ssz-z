@@ -90,16 +90,16 @@ pub const LeafNode = struct {
 /// if level 0, it's a leaf node without ref count
 /// from level 1, it's the BranchNode with no ref count
 pub const ZeroNode = struct {
-    hash: *const [32]u8,
+    hash: *[32]u8,
     // these are ZeroNode but want to conform to get* function signature
     left: ?*Node,
     right: ?*Node,
 
     // called and managed by NodePool
-    pub fn init(allocator: Allocator, hash: *const [32]u8, left: ?*Node, right: ?*Node) !*ZeroNode {
+    pub fn init(allocator: Allocator, zero_hash: *const [32]u8, left: ?*Node, right: ?*Node) !*ZeroNode {
         const zero = try allocator.create(ZeroNode);
-        // no need to copy because the input hash is zero_hash which is allocated by the same allocator
-        zero.hash = hash;
+        zero.hash = try allocator.create([32]u8);
+        @memcpy(zero.hash.*[0..], zero_hash.*[0..]);
         zero.left = left;
         zero.right = right;
         return zero;

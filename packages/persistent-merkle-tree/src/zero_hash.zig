@@ -47,7 +47,7 @@ pub fn initZeroHash(allocator: *const std.mem.Allocator, max_depth: usize) !void
     }
 }
 
-pub fn getZeroHash(depth: usize) !*[32]u8 {
+pub fn getZeroHash(depth: usize) !*const [32]u8 {
     if (instance == null) {
         return error.noInitZeroHash;
     }
@@ -74,4 +74,14 @@ test "ZeroHash" {
     };
     try std.testing.expectEqualSlices(u8, hash[0..], expected_hash[0..]);
     // std.debug.print("Hash value: {any}\n", .{hash});
+}
+
+test "memory allocation" {
+    var allocator = std.testing.allocator;
+    try initZeroHash(&allocator, 64);
+    defer deinitZeroHash();
+
+    for (0..64) |i| {
+        _ = try getZeroHash(i);
+    }
 }
