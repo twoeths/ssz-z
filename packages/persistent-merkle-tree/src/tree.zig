@@ -7,6 +7,35 @@ const MAX_NODES_DEPTH = @import("./const.zig").MAX_NODES_DEPTH;
 const util = @import("./util.zig");
 const toRootHex = @import("util").toRootHex;
 
+/// Binary merkle tree
+/// Wrapper around immutable `Node` to support mutability.
+pub const Tree = struct {
+    pool: *NodePool,
+    root_node: *Node,
+
+    pub fn getRoot(self: *const Tree) *const [32]u8 {
+        return nm.getRoot(self.root_node);
+    }
+
+    pub fn clone(self: *const Tree) Tree {
+        return .{
+            .pool = self.pool,
+            .root_node = self.root_node,
+        };
+    }
+
+    pub fn setTreeNode(self: *Tree, gindex: u64, node: *Node) !void {
+        const old_root = self.root_node;
+        self.root_node = try setNode(self.pool, old_root, gindex, node);
+        // return the old root node to the pool if possible
+        try self.pool.unref(old_root);
+    }
+
+    pub fn unref(self: *Tree) !void {
+        try self.pool.unref(self.root_node);
+    }
+};
+
 // TODO: HashComputation
 /// Set multiple nodes in batch, editing and traversing nodes strictly once.
 /// - gindexes MUST be sorted in ascending order beforehand.
@@ -291,15 +320,15 @@ test "setNode" {
     {
         const depth = 5;
         const zero_node = try pool.getZeroNode(depth);
+        // var tree = Tree{ .pool = &pool, .root_node = zero_node };
+        var tree = pool.getTree(zero_node);
         const leaf_node = try pool.newLeaf(&[_]u8{2} ** 32);
-        const root_node = try setNode(&pool, zero_node, 18, leaf_node);
-        const root_node_2 = try setNode(&pool, root_node, 46, leaf_node);
-        const root_node_3 = try setNode(&pool, root_node_2, 60, leaf_node);
-        const root = nm.getRoot(root_node_3);
+        try tree.setTreeNode(18, leaf_node);
+        try tree.setTreeNode(46, leaf_node);
+        try tree.setTreeNode(60, leaf_node);
+        const root = tree.getRoot();
         const root_hex = try toRootHex(root[0..]);
-        try pool.unref(root_node);
-        try pool.unref(root_node_2);
-        try pool.unref(root_node_3);
+        try tree.unref();
         try std.testing.expectEqualSlices(u8, "0x02607e58782c912e2f96f4ff9daf494d0d115e7c37e8c2b7ddce17213591151b", root_hex);
     }
 }

@@ -10,6 +10,7 @@ const BranchNode = nm.BranchNode;
 const LeafNode = nm.LeafNode;
 const MAX_NODES_DEPTH = @import("./const.zig").MAX_NODES_DEPTH;
 const zh = @import("./zero_hash.zig");
+const Tree = @import("./tree.zig").Tree;
 
 const LeafList = ArrayList(*Node);
 const BranchList = ArrayList(*Node);
@@ -63,6 +64,10 @@ pub const NodePool = struct {
         self.allocator.free(self.zero_list);
 
         nm.destroyNode(self.allocator, self.place_holder);
+    }
+
+    pub fn getTree(self: *NodePool, root: *Node) Tree {
+        return Tree{ .root_node = root, .pool = self };
     }
 
     pub fn newLeaf(self: *NodePool, hash: *const [32]u8) !*Node {
