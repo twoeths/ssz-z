@@ -4,6 +4,8 @@ const nm = @import("./node.zig");
 const Node = nm.Node;
 const NodePool = @import("./pool.zig").NodePool;
 const MAX_NODES_DEPTH = @import("./const.zig").MAX_NODES_DEPTH;
+const util = @import("./util.zig");
+const toRootHex = @import("util").toRootHex;
 
 // TODO: HashComputation
 /// Set multiple nodes in batch, editing and traversing nodes strictly once.
@@ -176,6 +178,16 @@ pub fn setNodesAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usi
     return node;
 }
 
+pub fn setNode(pool: *NodePool, root_node: *Node, gindex: u64, n: *Node) !*Node {
+    var all_bit_array = [_]bool{false} ** MAX_NODES_DEPTH;
+    const num_bits = try util.populateBitArray(all_bit_array[0..gindex], gindex);
+    var array_parent_nodes = [_]*Node{n} ** MAX_NODES_DEPTH;
+    const parent_nodes = array_parent_nodes[0..num_bits];
+    const bit_array = all_bit_array[0..num_bits];
+    try getParentNodes(parent_nodes, root_node, bit_array);
+    return try rebindNodeToRoot(pool, bit_array, parent_nodes, n);
+}
+
 ///
 /// depth depthi   gindexes   indexes
 /// 0     1           1          0
@@ -215,6 +227,81 @@ fn isLeftNode(depth_i: usize, index: usize) bool {
     const shift: u6 = @intCast(depth_i);
     const mask: usize = @as(usize, 1) << shift;
     return (index & mask) != mask;
+}
+
+/// Build a new tree structure from bitstring, parentNodes and a new node.
+/// Returns the new root node.
+fn rebindNodeToRoot(pool: *NodePool, bit_array: []bool, parent_nodes: []*Node, new_node: *Node) !*Node {
+    var node = new_node;
+
+    // Ignore the first bit, left right directions are at bits [1,..]
+    // Iterate the list backwards including the last bit, but offset the parentNodes array
+    // by one since the first bit in bitstring was ignored in the previous loop
+    var i = bit_array.len - 1;
+    while (i >= 1) : (i -= 1) {
+        const is_right = bit_array[i];
+        const parent_node = parent_nodes[i - 1];
+        node = if (is_right) try pool.newBranch(try nm.getLeft(parent_node), node) else try pool.newBranch(node, try nm.getRight(parent_node));
+    }
+
+    return node;
+}
+
+/// Traverse the tree from root node, ignore the last bit to get all parent nodes
+/// of the specified bitstring.
+fn getParentNodes(out: []*Node, root_node: *Node, bit_array: []bool) !void {
+    if (out.len != bit_array.len) {
+        return error.InvalidArgument;
+    }
+
+    // Keep a list of all parent nodes of node at gindex `index`. Then walk the list
+    // backwards to rebind them "recursively" with the new nodes without using functions
+    out[0] = root_node;
+    var node: *Node = root_node;
+    // Ignore the first bit, left right directions are at bits [1,..]
+    // Ignore the last bit, no need to push the target node to the parentNodes array
+    for (bit_array[1..], 0..) |bit, i| {
+        node = if (bit) try nm.getRight(node) else try nm.getLeft(node);
+        out[i + 1] = node;
+    }
+}
+
+// TODO: implement a Tree
+// - getRoot
+// - unref
+// - clone
+test "setNode" {
+    const allocator = std.testing.allocator;
+    var pool = try NodePool.init(allocator, 32);
+    defer pool.deinit();
+
+    // Should compute root correctly after setting a leaf
+    {
+        const depth = 4;
+        const zero_node = try pool.getZeroNode(depth);
+        const leaf_node = try pool.newLeaf(&[_]u8{2} ** 32);
+        const root_node = try setNode(&pool, zero_node, 18, leaf_node);
+        const root = nm.getRoot(root_node);
+        const root_hex = try toRootHex(root[0..]);
+        try pool.unref(root_node);
+        try std.testing.expectEqualSlices(u8, "0x3cfd85690fdd88abcf22ca7acf45bb47835326ff3166d3c953d5a23263fea2b2", root_hex);
+    }
+
+    // Should compute root correctly after setting 3 leafs
+    {
+        const depth = 5;
+        const zero_node = try pool.getZeroNode(depth);
+        const leaf_node = try pool.newLeaf(&[_]u8{2} ** 32);
+        const root_node = try setNode(&pool, zero_node, 18, leaf_node);
+        const root_node_2 = try setNode(&pool, root_node, 46, leaf_node);
+        const root_node_3 = try setNode(&pool, root_node_2, 60, leaf_node);
+        const root = nm.getRoot(root_node_3);
+        const root_hex = try toRootHex(root[0..]);
+        try pool.unref(root_node);
+        try pool.unref(root_node_2);
+        try pool.unref(root_node_3);
+        try std.testing.expectEqualSlices(u8, "0x02607e58782c912e2f96f4ff9daf494d0d115e7c37e8c2b7ddce17213591151b", root_hex);
+    }
 }
 
 test "findDiffDepthi" {
