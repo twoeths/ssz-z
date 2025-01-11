@@ -24,6 +24,10 @@ pub const Tree = struct {
         };
     }
 
+    pub fn getTreeNode(self: *const Tree, gindex: u64) !*Node {
+        return try getNode(self.root_node, gindex);
+    }
+
     pub fn setTreeNode(self: *Tree, gindex: u64, node: *Node) !void {
         const old_root = self.root_node;
         self.root_node = try setNode(self.pool, old_root, gindex, node);
@@ -35,6 +39,55 @@ pub const Tree = struct {
         try self.pool.unref(self.root_node);
     }
 };
+
+pub fn getNode(root_node: *const Node, gindex: u64) !*Node {
+    var all_bit_array = [_]bool{false} ** MAX_NODES_DEPTH;
+    const num_bits = try util.populateBitArray(all_bit_array[0..gindex], gindex);
+    var node = root_node;
+    for (1..num_bits) |i| {
+        node = if (all_bit_array[i]) try nm.getRight(node) else try nm.getLeft(node);
+    }
+
+    return node;
+}
+
+pub fn setNode(pool: *NodePool, root_node: *Node, gindex: u64, n: *Node) !*Node {
+    var all_bit_array = [_]bool{false} ** MAX_NODES_DEPTH;
+    const num_bits = try util.populateBitArray(all_bit_array[0..gindex], gindex);
+    var array_parent_nodes = [_]*Node{n} ** MAX_NODES_DEPTH;
+    const parent_nodes = array_parent_nodes[0..num_bits];
+    const bit_array = all_bit_array[0..num_bits];
+    try getParentNodes(parent_nodes, root_node, bit_array);
+    return try rebindNodeToRoot(pool, bit_array, parent_nodes, n);
+}
+
+pub fn getNodeAtDepth(root_node: *const Node, depth: usize, index: usize) !*const Node {
+    if (depth == 0) {
+        return root_node;
+    }
+
+    if (depth == 1) {
+        return if (index == 0) try nm.getLeft(root_node) else try nm.getRight(root_node);
+    }
+
+    // Ignore first bit "1", then substract 1 to get to the parent
+    const depth_i_root: usize = depth - 1;
+    const depth_i_parent: usize = 0;
+    var node = root_node;
+
+    var d = depth_i_root;
+    while (d >= depth_i_parent) : (d -= 1) {
+        node = if (isLeftNode(d, index)) try nm.getLeft(node) else try nm.getRight(node);
+    }
+
+    return node;
+}
+
+pub fn setNodeAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usize, index: usize, node_changed: *Node) *Node {
+    var indices = [_]usize{index};
+    const nodes_changed = [_]*Node{node_changed};
+    return try setNodesAtDepth(pool, root_node, nodes_depth, indices[0..], nodes_changed[0..]);
+}
 
 // TODO: HashComputation
 /// Set multiple nodes in batch, editing and traversing nodes strictly once.
@@ -207,15 +260,7 @@ pub fn setNodesAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usi
     return node;
 }
 
-pub fn setNode(pool: *NodePool, root_node: *Node, gindex: u64, n: *Node) !*Node {
-    var all_bit_array = [_]bool{false} ** MAX_NODES_DEPTH;
-    const num_bits = try util.populateBitArray(all_bit_array[0..gindex], gindex);
-    var array_parent_nodes = [_]*Node{n} ** MAX_NODES_DEPTH;
-    const parent_nodes = array_parent_nodes[0..num_bits];
-    const bit_array = all_bit_array[0..num_bits];
-    try getParentNodes(parent_nodes, root_node, bit_array);
-    return try rebindNodeToRoot(pool, bit_array, parent_nodes, n);
-}
+// TODO: getNodesAtDepth
 
 ///
 /// depth depthi   gindexes   indexes
