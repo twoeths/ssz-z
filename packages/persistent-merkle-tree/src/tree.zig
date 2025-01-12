@@ -13,10 +13,19 @@ pub const Tree = struct {
     pool: *NodePool,
     root_node: *Node,
 
+    // TODO: createFromProof
+
+    /// The root node of the tree
+    pub fn getRootNode(self: *const Tree) *const Node {
+        return self.root_node;
+    }
+
+    /// The root hash of the tree
     pub fn getRoot(self: *const Tree) *const [32]u8 {
         return nm.getRoot(self.root_node);
     }
 
+    /// Return a copy of the tree
     pub fn clone(self: *const Tree) Tree {
         return .{
             .pool = self.pool,
@@ -24,16 +33,80 @@ pub const Tree = struct {
         };
     }
 
+    /// Return the subtree at the specified gindex.
+    /// Note: The returned subtree will have a `hook` attached to the parent tree.
+    /// Updates to the subtree will result in updates to the parent.
+    pub fn getSubTree(self: *const Tree, index: u64) Tree {
+        const node = try getNode(self.root_node, index);
+        return Tree{ .pool = self.pool, .root_node = node };
+    }
+
+    /// Return the node at the specified gindex.
     pub fn getTreeNode(self: *const Tree, gindex: u64) !*Node {
         return try getNode(self.root_node, gindex);
     }
 
+    /// Return the node at the specified depth and index.
+    /// Supports index up to `Number.MAX_SAFE_INTEGER`.
+    pub fn getTreeNodeAtDepth(self: *const Tree, depth: usize, index: usize) !*Node {
+        return getNodeAtDepth(self.root_node, depth, index);
+    }
+
+    /// Return the hash at the specified gindex.
+    pub fn getRootOfNode(self: *const Tree, index: u64) !*[32]u8 {
+        const node = try getNode(self.root_node, index);
+        return nm.getRoot(node);
+    }
+
+    /// Set the node at at the specified gindex.
     pub fn setTreeNode(self: *Tree, gindex: u64, node: *Node) !void {
         const old_root = self.root_node;
         self.root_node = try setNode(self.pool, old_root, gindex, node);
         // return the old root node to the pool if possible
         try self.pool.unref(old_root);
     }
+
+    /// Traverse to the node at the specified gindex,
+    /// then apply the function to get a new node and set the node at the specified gindex with the result.
+    ///
+    /// This is a convenient method to avoid traversing the tree 2 times to
+    /// get and set.
+    pub fn setTreeNodeWithFn(self: *Tree, gindex: u64, getNewNode: fn (*Node) *Node) !void {
+        const old_root = self.root_node;
+        self.root_node = try setNodeWithFn(self.pool, old_root, gindex, getNewNode);
+        // return the old root node to the pool if possible
+        try self.pool.unref(old_root);
+    }
+
+    /// Set the node at the specified depth and index.
+    /// Supports index up to `Number.MAX_SAFE_INTEGER`.
+    pub fn setTreeNodeAtDepth(self: *Tree, depth: usize, index: usize, node: *Node) !void {
+        const old_root = self.root_node;
+        self.root_node = try setNodeAtDepth(self.pool, old_root, depth, index, node);
+        // return the old root node to the pool if possible
+        try self.pool.unref(old_root);
+    }
+
+    /// Set the hash at the specified gindex.
+    /// Note: This will set a new `LeafNode` at the specified gindex.
+    pub fn setRootOfNode(self: *Tree, index: u64, hash: *const [32]u8) !void {
+        const left_node = try self.pool.newLeaf(hash);
+        try self.setTreeNode(index, left_node);
+    }
+
+    /// Fast read-only iteration
+    /// In-order traversal of nodes at `depth`
+    /// starting from the `startIndex`-indexed node
+    /// iterating through `count` nodes
+    pub fn getTreeNodesAtDepth(self: *const Tree, depth: usize, start_index: usize, count: usize, out: []*Node) !usize {
+        return getNodesAtDepth(self.root_node, depth, start_index, count, out);
+    }
+
+    // TODO: iterateNodesAtDepth() returns IterableIterator<Node> in typescript
+    // find equivalent way in zig or just use getNodesAtDepth()
+
+    // TODO: getSingleProof
+    // TODO: getProof
 
     pub fn unref(self: *Tree) !void {
         try self.pool.unref(self.root_node);
@@ -59,6 +132,30 @@ pub fn setNode(pool: *NodePool, root_node: *Node, gindex: u64, n: *Node) !*Node 
     const bit_array = all_bit_array[0..num_bits];
     try getParentNodes(parent_nodes, root_node, bit_array);
     return try rebindNodeToRoot(pool, bit_array, parent_nodes, n);
+}
+
+/// Traverse to the node at the specified gindex,
+/// then apply the function to get a new node and set the node at the specified gindex with the result.
+///
+/// This is a convenient method to avoid traversing the tree 2 times to
+/// get and set.
+///
+/// Returns the new root node.
+pub fn setNodeWithFn(pool: *NodePool, root_node: *const Node, gindex: u64, getNewNode: fn (*Node) *Node) !*Node {
+    // Pre-compute entire bitstring instead of using an iterator (25% faster)
+    var all_bit_array = [_]bool{false} ** MAX_NODES_DEPTH;
+    const num_bits = try util.populateBitArray(all_bit_array[0..gindex], gindex);
+    var array_parent_nodes = [_]*Node{root_node} ** MAX_NODES_DEPTH;
+    const parent_nodes = array_parent_nodes[0..num_bits];
+    const bit_array = all_bit_array[0..num_bits];
+    try getParentNodes(parent_nodes, root_node, bit_array);
+
+    const last_parent_node = parent_nodes[parent_nodes.len - 1];
+    const last_bit = bit_array[bit_array.len - 1];
+    const old_node = if (last_bit) try nm.getRight(last_parent_node) else try nm.getLeft(last_parent_node);
+    const new_node = getNewNode(old_node);
+
+    return try rebindNodeToRoot(pool, bit_array, parent_nodes, new_node);
 }
 
 pub fn getNodeAtDepth(root_node: *const Node, depth: usize, index: usize) !*const Node {
@@ -127,7 +224,8 @@ pub fn setNodesAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usi
 
     // Contiguous filled stack of parent nodes. It get filled in the first descent
     // Indexed by depthi
-    var parent_nodes_stack = [_]*Node{@constCast(root_node)} ** MAX_NODES_DEPTH;
+    // var parent_nodes_stack = [_]*Node{@constCast(root_node)} ** MAX_NODES_DEPTH;
+    var parent_nodes_stack: [MAX_NODES_DEPTH]*Node = undefined;
 
     // Temp stack of left parent nodes, index by depthi.
     // Node leftParentNodeStack[depthi] is a node at d = depthi - 1, such that:
@@ -260,7 +358,173 @@ pub fn setNodesAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usi
     return node;
 }
 
-// TODO: getNodesAtDepth
+/// Fast read-only iteration
+/// In-order traversal of nodes at `depth`
+/// starting from the `startIndex`-indexed node
+/// iterating through `count` nodes
+/// return number of returned nodes
+///
+/// **Strategy**
+/// 1. Navigate down to parentDepth storing a stack of parents
+/// 2. At target level push current node
+/// 3. Go up to the first level that navigated left
+/// 4. Repeat (1) for next index
+pub fn getNodesAtDepth(root_node: *const Node, depth: usize, start_index: usize, count: usize, out: []*Node) !usize {
+    // Optimized paths for short trees (x20 times faster)
+    if (depth == 0) {
+        if (start_index == 0 and count > 0) {
+            if (out.len == 0) {
+                return error.Out_Nodes_Too_Small;
+            }
+            out[0] = root_node;
+            return 1;
+        } else {
+            return 0;
+        }
+    } else if (depth == 1) {
+        if (count == 0) {
+            return 0;
+        } else if (count == 1) {
+            if (out.len == 0) {
+                return error.Out_Nodes_Too_Small;
+            }
+            return if (start_index == 0) try nm.getLeft(root_node) else try nm.getRight(root_node);
+        } else {
+            // 2 nodes
+            if (out.len < 2) {
+                return error.Out_Nodes_Too_Small;
+            }
+            out[0] = try nm.getLeft(root_node);
+            out[1] = try nm.getRight(root_node);
+            return 2;
+        }
+    }
+
+    // Ignore first bit "1", then substract 1 to get to the parent
+    const depthi_root: usize = depth - 1;
+    const depthi_parent: usize = 0;
+    var depthi = depthi_root;
+    var node: *Node = root_node;
+
+    // Contiguous filled stack of parent nodes. It get filled in the first descent
+    // Indexed by depthi
+    var parent_nodes_stack: [MAX_NODES_DEPTH]*Node = undefined;
+    var is_left_stack: [MAX_NODES_DEPTH]bool = undefined;
+
+    // Insert root node to make the loop below general
+    parent_nodes_stack[depthi_root] = root_node;
+
+    for (0..count) |i| {
+        var d = depthi;
+        while (d >= depthi_parent) : (d -= 1) {
+            if (d != depthi) {
+                parent_nodes_stack[d] = node;
+            }
+
+            const is_left = isLeftNode(d, start_index + i);
+            is_left_stack[d] = is_left;
+            node = if (is_left) try nm.getLeft(node) else try nm.getRight(node);
+        }
+
+        out[i] = node;
+
+        // Find the first depth where navigation when left.
+        // Store that height and go right from there
+        for (depthi_parent..(depthi_root + 1)) |d2| {
+            if (is_left_stack(d2)) {
+                depthi = depth;
+                break;
+            }
+        }
+
+        node = parent_nodes_stack[depthi];
+    }
+}
+
+/// TODO: iterateNodesAtDepth() returns IterableIterator<Node> in typescript
+/// find equivalent way in zig or just use getNodesAtDepth()
+///
+///
+///Zero's all nodes right of index with constant depth of `nodesDepth`.
+///For example, zero-ing this tree at depth 2 after index 0
+///```
+///   X              X
+/// X   X    ->    X   0
+///X X X X        X 0 0 0
+///```
+///Or, zero-ing this tree at depth 3 after index 2
+///```
+///       X                     X
+///   X       X             X       0
+/// X   X   X   X    ->   X   X   0   0
+///X X X X X X X X       X X X 0 0 0 0 0
+///```
+///The strategy is to first navigate down to `nodesDepth` and `index` and keep a stack of parents.
+///Then navigate up re-binding:
+///- If navigated to the left rebind with zeroNode()
+///- If navigated to the right rebind with parent.left from the stack
+pub fn treeZeroAfterIndex(pool: *NodePool, root_node: *const Node, nodes_depth: usize, index: usize) !*Node {
+    // depth depthi   gindexes   indexes
+    // 0     1           1          0
+    // 1     0         2   3      0   1
+    // 2     -        4 5 6 7    0 1 2 3
+    // '10' means, at depth 1, node is at the left
+    //
+    // For index N check if the bit at position depthi is set to navigate right at depthi
+    // ```
+    // mask = 1 << depthi
+    // goRight = (N & mask) == mask
+    // ```
+
+    // Degenerate case where tree is zero after a negative index (-1).
+    // All positive indexes are zero, so the entire tree is zero. Return cached zero node as root.
+    // in Zig this never happens
+    // if (index < 0) {
+    //     return zeroNode(nodesDepth);
+    // }
+
+    // Contiguous filled stack of parent nodes. It get filled in the first descent
+    // Indexed by depthi
+    var parent_nodes_stack: [MAX_NODES_DEPTH]*Node = undefined;
+
+    // Ignore first bit "1", then substract 1 to get to the parent
+    const depthi_root = nodes_depth - 1;
+    const depthi_parent = 0;
+    var depthi = depthi_root;
+    var node = root_node;
+
+    // Insert root node to make the loop below general
+    parent_nodes_stack[depthi_root] = root_node;
+
+    // Navigate down until parent depth, and store the chain of nodes
+    //
+    // Stops at the depthiParent level. To rebind below down to `nodesDepth`
+    var d = depthi;
+    while (d >= depthi_parent) : (d -= 1) {
+        node = if (isLeftNode(d, index)) try nm.getLeft(node) else try nm.getRight(node);
+        parent_nodes_stack[d - 1] = node;
+    }
+
+    depthi = depthi_parent;
+
+    // Now climb up re-binding with either zero of existing tree.
+
+    for (depthi_parent..(depthi_root + 1)) |d2| {
+        if (isLeftNode(d2, index)) {
+            // If navigated to the left, then all the child nodes of the right node are NOT part of the new tree.
+            // So re-bind new `node` with a zeroNode at the current depth.
+            node = try pool.newBranch(node, try pool.getZeroNode(d2));
+        } else {
+            // If navigated to the right, then all the child nodes of the left node are part of the new tree.
+            // So re-bind new `node` with the existing left node of the parent.
+            // node = new BranchNode(parentNodeStack[d].left, node);
+            node = try pool.newBranch(try nm.getLeft(parent_nodes_stack[d2]), node);
+        }
+    }
+
+    // Done, return new root node
+    return node;
+}
 
 ///
 /// depth depthi   gindexes   indexes
