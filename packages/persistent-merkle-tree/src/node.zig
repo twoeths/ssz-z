@@ -14,6 +14,8 @@ pub const Node = union(NodeType) {
     Zero: ZeroNode,
 };
 
+pub const NodeError = error{ OutOfMemory, NoLeft, NoRight };
+
 pub const BranchNode = struct {
     // cannot use const here because it's designed to be reused
     hash: *[32]u8,
@@ -23,7 +25,7 @@ pub const BranchNode = struct {
     ref_count: usize,
 
     // called and managed by NodePool
-    pub fn init(allocator: Allocator, left: *Node, right: *Node) !*Node {
+    pub fn init(allocator: Allocator, left: *Node, right: *Node) NodeError!*Node {
         const node = try allocator.create(Node);
         node.* = Node{ .Branch = .{
             .hash = try allocator.create([32]u8),
@@ -39,6 +41,7 @@ pub const BranchNode = struct {
 
     // NodePool will deinit in batch
 
+    /// mutate self to compute hash and return it
     pub fn root(self: *BranchNode) *const [32]u8 {
         if (self.hash_computed == true) {
             return self.hash;
@@ -80,7 +83,7 @@ pub const LeafNode = struct {
 
     // NodePool will deinit in batch
 
-    pub fn root(self: *LeafNode) *const [32]u8 {
+    pub fn root(self: *const LeafNode) *const [32]u8 {
         return self.hash;
     }
 
@@ -116,7 +119,7 @@ pub const ZeroNode = struct {
         return node;
     }
 
-    pub fn root(self: *LeafNode) *const [32]u8 {
+    pub fn root(self: *const LeafNode) *const [32]u8 {
         return self.hash;
     }
 };
@@ -143,6 +146,7 @@ pub fn destroyNode(allocator: Allocator, node: *Node) void {
     allocator.destroy(node);
 }
 
+/// no const, node could be mutated if hash is not computed before this call
 pub fn getRoot(node: *Node) *const [32]u8 {
     switch (node.*) {
         .Leaf => return node.Leaf.root(),
@@ -151,7 +155,12 @@ pub fn getRoot(node: *Node) *const [32]u8 {
     }
 }
 
-pub fn getLeft(node: *const Node) !*Node {
+pub fn getLeft(node: *const Node) NodeError!*const Node {
+    return getLeftMut(node);
+}
+
+/// the same to getLeft() but with mutable return type
+pub fn getLeftMut(node: *const Node) NodeError!*Node {
     switch (node.*) {
         .Branch => return node.Branch.left,
         .Zero => return node.Zero.left orelse return error.NoLeft,
@@ -159,7 +168,12 @@ pub fn getLeft(node: *const Node) !*Node {
     }
 }
 
-pub fn getRight(node: *const Node) !*Node {
+pub fn getRight(node: *const Node) NodeError!*const Node {
+    return getRightMut(node);
+}
+
+/// the same to getRight() but with mutable return type
+pub fn getRightMut(node: *const Node) NodeError!*Node {
     switch (node.*) {
         .Branch => return node.Branch.right,
         .Zero => return node.Zero.right orelse return error.NoRight,

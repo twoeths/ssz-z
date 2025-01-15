@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const expect = std.testing.expect;
 const nm = @import("./node.zig");
 const Node = nm.Node;
@@ -7,63 +8,90 @@ const MAX_NODES_DEPTH = @import("./const.zig").MAX_NODES_DEPTH;
 const util = @import("./util.zig");
 const toRootHex = @import("util").toRootHex;
 
-/// Binary merkle tree
-/// Wrapper around immutable `Node` to support mutability.
+pub const TreeError = nm.NodeError || error{ TooFewBits, InvalidArgument } || Allocator.Error;
+
+/// callback information to ask the parent tree to update the root node
+/// due to subtree's new root. This is equivalent to a hook in Typescript implementation.
+const ParentTree = struct {
+    tree: *Tree,
+    // gindex of root node of the subtree in the parent tree
+    gindex_in_parent: u64,
+};
+
+/// binary merkle tree
+/// wrapper around immutable `Node` to support mutability.
+/// no need to allocate/deallocate since nodes are managed by pool.
 pub const Tree = struct {
     pool: *NodePool,
-    root_node: *Node,
+    // do not set this field directly, do it through setRootNode()
+    // no const, this could be mutated if hash is not computed yet
+    _root_node: *Node,
+    parent: ?ParentTree,
 
     // TODO: createFromProof
 
     /// The root node of the tree
     pub fn getRootNode(self: *const Tree) *const Node {
-        return self.root_node;
+        return self._root_node;
+    }
+
+    /// Setting the root node will trigger a call to the tree's `hook` if it exists.
+    pub fn setRootNode(self: *Tree, new_node: *Node) !void {
+        const old_root = self._root_node;
+        self._root_node = new_node;
+        // return the old root node to the pool if possible
+        try self.pool.unref(old_root);
+
+        // similar to a hook to the parent tree to update its root node
+        if (self.parent) |parent| {
+            try parent.tree.setTreeNode(parent.gindex_in_parent, new_node);
+        }
     }
 
     /// The root hash of the tree
     pub fn getRoot(self: *const Tree) *const [32]u8 {
-        return nm.getRoot(self.root_node);
+        return nm.getRoot(self._root_node);
     }
 
     /// Return a copy of the tree
     pub fn clone(self: *const Tree) Tree {
         return .{
             .pool = self.pool,
-            .root_node = self.root_node,
+            .root_node = self._root_node,
         };
     }
 
     /// Return the subtree at the specified gindex.
     /// Note: The returned subtree will have a `hook` attached to the parent tree.
     /// Updates to the subtree will result in updates to the parent.
-    pub fn getSubTree(self: *const Tree, index: u64) Tree {
-        const node = try getNode(self.root_node, index);
-        return Tree{ .pool = self.pool, .root_node = node };
+    pub fn getSubTree(self: *Tree, gindex: u64) !Tree {
+        // this node is mutable because hash is not computed yet
+        const node = try getNodeMut(self._root_node, gindex);
+        return Tree{ .pool = self.pool, ._root_node = node, .parent = .{ .tree = self, .gindex_in_parent = gindex } };
     }
 
     /// Return the node at the specified gindex.
     pub fn getTreeNode(self: *const Tree, gindex: u64) !*Node {
-        return try getNode(self.root_node, gindex);
+        return try getNode(self._root_node, gindex);
     }
 
     /// Return the node at the specified depth and index.
     /// Supports index up to `Number.MAX_SAFE_INTEGER`.
     pub fn getTreeNodeAtDepth(self: *const Tree, depth: usize, index: usize) !*Node {
-        return getNodeAtDepth(self.root_node, depth, index);
+        return getNodeAtDepth(self._root_node, depth, index);
     }
 
     /// Return the hash at the specified gindex.
     pub fn getRootOfNode(self: *const Tree, index: u64) !*[32]u8 {
-        const node = try getNode(self.root_node, index);
+        const node = try getNode(self._root_node, index);
         return nm.getRoot(node);
     }
 
     /// Set the node at at the specified gindex.
-    pub fn setTreeNode(self: *Tree, gindex: u64, node: *Node) !void {
-        const old_root = self.root_node;
-        self.root_node = try setNode(self.pool, old_root, gindex, node);
-        // return the old root node to the pool if possible
-        try self.pool.unref(old_root);
+    pub fn setTreeNode(self: *Tree, gindex: u64, node: *Node) TreeError!void {
+        const old_root = self._root_node;
+        const new_root = try setNode(self.pool, old_root, gindex, node);
+        try self.setRootNode(new_root);
     }
 
     /// Traverse to the node at the specified gindex,
@@ -72,19 +100,17 @@ pub const Tree = struct {
     /// This is a convenient method to avoid traversing the tree 2 times to
     /// get and set.
     pub fn setTreeNodeWithFn(self: *Tree, gindex: u64, getNewNode: fn (*Node) *Node) !void {
-        const old_root = self.root_node;
-        self.root_node = try setNodeWithFn(self.pool, old_root, gindex, getNewNode);
-        // return the old root node to the pool if possible
-        try self.pool.unref(old_root);
+        const old_root = self._root_node;
+        const new_root = try setNodeWithFn(self.pool, old_root, gindex, getNewNode);
+        self.setRootNode(new_root);
     }
 
     /// Set the node at the specified depth and index.
     /// Supports index up to `Number.MAX_SAFE_INTEGER`.
     pub fn setTreeNodeAtDepth(self: *Tree, depth: usize, index: usize, node: *Node) !void {
-        const old_root = self.root_node;
-        self.root_node = try setNodeAtDepth(self.pool, old_root, depth, index, node);
-        // return the old root node to the pool if possible
-        try self.pool.unref(old_root);
+        const old_root = self._root_node;
+        const new_root = try setNodeAtDepth(self.pool, old_root, depth, index, node);
+        self.setRootNode(new_root);
     }
 
     /// Set the hash at the specified gindex.
@@ -99,7 +125,7 @@ pub const Tree = struct {
     /// starting from the `startIndex`-indexed node
     /// iterating through `count` nodes
     pub fn getTreeNodesAtDepth(self: *const Tree, depth: usize, start_index: usize, count: usize, out: []*Node) !usize {
-        return getNodesAtDepth(self.root_node, depth, start_index, count, out);
+        return getNodesAtDepth(self._root_node, depth, start_index, count, out);
     }
 
     // TODO: iterateNodesAtDepth() returns IterableIterator<Node> in typescript
@@ -109,22 +135,27 @@ pub const Tree = struct {
     // TODO: getProof
 
     pub fn unref(self: *Tree) !void {
-        try self.pool.unref(self.root_node);
+        try self.pool.unref(self._root_node);
     }
 };
 
-pub fn getNode(root_node: *const Node, gindex: u64) !*Node {
+pub fn getNode(root_node: *const Node, gindex: u64) !*const Node {
+    return getNodeMut(root_node, gindex);
+}
+
+/// the same to getNode() but returns mutable node
+pub fn getNodeMut(root_node: *const Node, gindex: u64) !*Node {
     var all_bit_array = [_]bool{false} ** MAX_NODES_DEPTH;
     const num_bits = try util.populateBitArray(all_bit_array[0..gindex], gindex);
-    var node = root_node;
+    var node = @constCast(root_node);
     for (1..num_bits) |i| {
-        node = if (all_bit_array[i]) try nm.getRight(node) else try nm.getLeft(node);
+        node = if (all_bit_array[i]) try nm.getRightMut(node) else try nm.getLeftMut(node);
     }
 
     return node;
 }
 
-pub fn setNode(pool: *NodePool, root_node: *Node, gindex: u64, n: *Node) !*Node {
+pub fn setNode(pool: *NodePool, root_node: *const Node, gindex: u64, n: *Node) TreeError!*Node {
     var all_bit_array = [_]bool{false} ** MAX_NODES_DEPTH;
     const num_bits = try util.populateBitArray(all_bit_array[0..gindex], gindex);
     var array_parent_nodes = [_]*Node{n} ** MAX_NODES_DEPTH;
@@ -254,8 +285,8 @@ pub fn setNodesAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usi
         // Stops at the level above depthiParent. For the re-binding routing below node must be at depthiParent
         var d: usize = depth_i;
         while (d > depth_i_parent) : (d -= 1) {
-            node = if (isLeftNode(d, index)) try nm.getLeft(node) else try nm.getRight(node);
-            parent_nodes_stack[d - 1] = node;
+            node = if (isLeftNode(d, index)) try nm.getLeftMut(node) else try nm.getRightMut(node);
+            parent_nodes_stack[d - 1] = @constCast(node);
         }
 
         depth_i = depth_i_parent;
@@ -284,11 +315,11 @@ pub fn setNodesAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usi
                 i += 1;
             } else {
                 const old_node = node;
-                node = try pool.newBranch(nodes[i], try nm.getRight(old_node));
+                node = try pool.newBranch(nodes[i], try nm.getRightMut(old_node));
             }
         } else {
             const old_node = node;
-            node = try pool.newBranch(try nm.getLeft(old_node), nodes[i]);
+            node = try pool.newBranch(try nm.getLeftMut(old_node), nodes[i]);
         }
 
         // Here `node` is the new BranchNode at depthi `depthiParent`
@@ -329,7 +360,7 @@ pub fn setNodesAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usi
                     // If it's last index, bind with parent since it won't navigate to the right anymore
                     // Also, if still has to move upwards, rebind since the node won't be visited anymore
                     const old_node = node;
-                    node = try pool.newBranch(old_node, try nm.getRight(node_d));
+                    node = try pool.newBranch(old_node, try nm.getRightMut(node_d));
                 } else {
                     // Only store the left node if it's at d = diffDepth
                     left_parent_node_stack[d] = node;
@@ -345,7 +376,7 @@ pub fn setNodesAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usi
                 } else {
                     const old_node = node;
                     const node_d = parent_nodes_stack[d] orelse return error.IncorrectParentNode;
-                    node = try pool.newBranch(try nm.getLeft(node_d), old_node);
+                    node = try pool.newBranch(try nm.getLeftMut(node_d), old_node);
                 }
             }
         }
@@ -370,7 +401,7 @@ pub fn setNodesAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usi
 /// 2. At target level push current node
 /// 3. Go up to the first level that navigated left
 /// 4. Repeat (1) for next index
-pub fn getNodesAtDepth(root_node: *const Node, depth: usize, start_index: usize, count: usize, out: []*Node) !usize {
+pub fn getNodesAtDepth(root_node: *const Node, depth: usize, start_index: usize, count: usize, out: []*const Node) !usize {
     // Optimized paths for short trees (x20 times faster)
     if (depth == 0) {
         if (start_index == 0 and count > 0) {
@@ -406,11 +437,11 @@ pub fn getNodesAtDepth(root_node: *const Node, depth: usize, start_index: usize,
     const depthi_root: usize = depth - 1;
     const depthi_parent: usize = 0;
     var depthi = depthi_root;
-    var node: *Node = @constCast(root_node);
+    var node: *const Node = root_node;
 
     // Contiguous filled stack of parent nodes. It get filled in the first descent
     // Indexed by depthi
-    var parent_nodes_stack = [_]?*Node{undefined} ** MAX_NODES_DEPTH;
+    var parent_nodes_stack = [_]?*const Node{undefined} ** MAX_NODES_DEPTH;
     var is_left_stack = [_]bool{false} ** MAX_NODES_DEPTH;
 
     // Insert root node to make the loop below general
@@ -583,7 +614,7 @@ fn isLeftNode(depth_i: usize, index: usize) bool {
 
 /// Build a new tree structure from bitstring, parentNodes and a new node.
 /// Returns the new root node.
-fn rebindNodeToRoot(pool: *NodePool, bit_array: []bool, parent_nodes: []*Node, new_node: *Node) !*Node {
+fn rebindNodeToRoot(pool: *NodePool, bit_array: []bool, parent_nodes: []*Node, new_node: *Node) nm.NodeError!*Node {
     var node = new_node;
 
     // Ignore the first bit, left right directions are at bits [1,..]
@@ -593,7 +624,7 @@ fn rebindNodeToRoot(pool: *NodePool, bit_array: []bool, parent_nodes: []*Node, n
     while (i >= 1) : (i -= 1) {
         const is_right = bit_array[i];
         const parent_node = parent_nodes[i - 1];
-        node = if (is_right) try pool.newBranch(try nm.getLeft(parent_node), node) else try pool.newBranch(node, try nm.getRight(parent_node));
+        node = if (is_right) try pool.newBranch(try nm.getLeftMut(parent_node), node) else try pool.newBranch(node, try nm.getRightMut(parent_node));
     }
 
     return node;
@@ -601,7 +632,7 @@ fn rebindNodeToRoot(pool: *NodePool, bit_array: []bool, parent_nodes: []*Node, n
 
 /// Traverse the tree from root node, ignore the last bit to get all parent nodes
 /// of the specified bitstring.
-fn getParentNodes(out: []*Node, root_node: *Node, bit_array: []bool) !void {
+fn getParentNodes(out: []*const Node, root_node: *const Node, bit_array: []bool) TreeError!void {
     if (out.len != bit_array.len) {
         return error.InvalidArgument;
     }
@@ -609,7 +640,7 @@ fn getParentNodes(out: []*Node, root_node: *Node, bit_array: []bool) !void {
     // Keep a list of all parent nodes of node at gindex `index`. Then walk the list
     // backwards to rebind them "recursively" with the new nodes without using functions
     out[0] = root_node;
-    var node: *Node = root_node;
+    var node: *const Node = root_node;
     // Ignore the first bit, left right directions are at bits [1,..]
     // Ignore the last bit, no need to push the target node to the parentNodes array
     for (bit_array[1..], 0..) |bit, i| {
@@ -638,6 +669,37 @@ test "should properly navigate the zero tree" {
         const root = nm.getRoot(node);
         try std.testing.expectEqualSlices(u8, zero_root.*[0..], root.*[0..]);
     }
+}
+
+// should properly navigate a custom tree
+
+// batchHash() vs root getter
+
+test "subtree mutation - changing a subtree should change the parent root" {
+    const allocator = std.testing.allocator;
+    var pool = try NodePool.init(allocator, 32);
+    defer pool.deinit();
+    const depth = 2;
+    const zero_node = try pool.getZeroNode(depth);
+    var tree = pool.getTree(zero_node);
+
+    // Get the subtree with "X"s
+    //       0
+    //      /  \
+    //    0      X
+    //   / \    / \
+    //  0   0  X   X
+
+    var sub_tree = try tree.getSubTree(3);
+    const new_root = [_]u8{1} ** 32;
+    const root_before = tree.getRoot();
+    try sub_tree.setRootOfNode(3, &new_root);
+    const root_after = tree.getRoot();
+    // expectEqualSlices should be false, usually the 1st u8 changed
+    try expect(root_before.*[0] != root_after.*[0]);
+
+    // clean up
+    try tree.unref();
 }
 
 test "setNode" {
@@ -669,8 +731,10 @@ test "setNode" {
         try tree.setTreeNode(60, leaf_node);
         const root = tree.getRoot();
         const root_hex = try toRootHex(root[0..]);
-        try tree.unref();
         try std.testing.expectEqualSlices(u8, "0x02607e58782c912e2f96f4ff9daf494d0d115e7c37e8c2b7ddce17213591151b", root_hex);
+
+        // clean up
+        try tree.unref();
     }
 }
 

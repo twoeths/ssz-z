@@ -7,6 +7,10 @@ const expect = std.testing.expect;
 /// 42 => [true false true false true false false false] = 0b101010
 var byteToBitBooleanArrays: [256]?[8]bool = [_]?[8]bool{null} ** 256;
 
+pub const Error = error{
+    TooFewBits,
+};
+
 /// equivalent version of javascript's Number.toString(2)
 /// it returns big-endian format
 pub fn getByteBoolArray(byte: u8) [8]bool {
@@ -25,7 +29,7 @@ pub fn getByteBoolArray(byte: u8) [8]bool {
 /// given a big bit_array and a gindex, populate the bit_array with the bits of gindex using getByteBoolArray
 /// return the total number of bits populated
 /// note that this is big-endian, which is the same to javascript's Number.toString(2)
-pub fn populateBitArray(bit_array: []bool, gindex: u64) !u8 {
+pub fn populateBitArray(bit_array: []bool, gindex: u64) Error!u8 {
     const total_num_bits = numBits(gindex);
     if (bit_array.len < total_num_bits) {
         return error.TooFewBits;

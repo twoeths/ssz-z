@@ -67,7 +67,7 @@ pub const NodePool = struct {
     }
 
     pub fn getTree(self: *NodePool, root: *Node) Tree {
-        return Tree{ .root_node = root, .pool = self };
+        return Tree{ ._root_node = root, .pool = self, .parent = null };
     }
 
     pub fn newLeaf(self: *NodePool, hash: *const [32]u8) !*Node {
@@ -91,7 +91,7 @@ pub const NodePool = struct {
     }
 
     /// cannot make left and right as const since we may modify its ref_count
-    pub fn newBranch(self: *NodePool, left: *Node, right: *Node) !*Node {
+    pub fn newBranch(self: *NodePool, left: *Node, right: *Node) nm.NodeError!*Node {
         const nodeOrNull = self.branch_nodes.popOrNull();
         if (nodeOrNull) |node| {
             // reuse BranchNode from pool
@@ -123,7 +123,7 @@ pub const NodePool = struct {
         return self.zero_list[depth];
     }
 
-    pub fn unref(self: *NodePool, node: *Node) !void {
+    pub fn unref(self: *NodePool, node: *Node) Allocator.Error!void {
         switch (node.*) {
             .Leaf => {
                 const leaf = &node.Leaf;
