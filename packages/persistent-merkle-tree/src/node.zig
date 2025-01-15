@@ -151,7 +151,7 @@ pub fn getRoot(node: *Node) *const [32]u8 {
     }
 }
 
-pub fn getLeft(node: *Node) !*Node {
+pub fn getLeft(node: *const Node) !*Node {
     switch (node.*) {
         .Branch => return node.Branch.left,
         .Zero => return node.Zero.left orelse return error.NoLeft,
@@ -159,7 +159,7 @@ pub fn getLeft(node: *Node) !*Node {
     }
 }
 
-pub fn getRight(node: *Node) !*Node {
+pub fn getRight(node: *const Node) !*Node {
     switch (node.*) {
         .Branch => return node.Branch.right,
         .Zero => return node.Zero.right orelse return error.NoRight,

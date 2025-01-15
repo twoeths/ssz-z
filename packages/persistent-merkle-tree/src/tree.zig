@@ -224,8 +224,7 @@ pub fn setNodesAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usi
 
     // Contiguous filled stack of parent nodes. It get filled in the first descent
     // Indexed by depthi
-    // var parent_nodes_stack = [_]*Node{@constCast(root_node)} ** MAX_NODES_DEPTH;
-    var parent_nodes_stack: [MAX_NODES_DEPTH]*Node = undefined;
+    var parent_nodes_stack = [_]?*Node{undefined} ** MAX_NODES_DEPTH;
 
     // Temp stack of left parent nodes, index by depthi.
     // Node leftParentNodeStack[depthi] is a node at d = depthi - 1, such that:
@@ -325,15 +324,16 @@ pub fn setNodesAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usi
                 return error.InvalidDepth;
             }
             if (isLeftNode(d, index)) {
+                const node_d = parent_nodes_stack[d] orelse return error.IncorrectParentNode;
                 if (is_last_index or d != diff_depth_i) {
                     // If it's last index, bind with parent since it won't navigate to the right anymore
                     // Also, if still has to move upwards, rebind since the node won't be visited anymore
                     const old_node = node;
-                    node = try pool.newBranch(old_node, try nm.getRight(parent_nodes_stack[d]));
+                    node = try pool.newBranch(old_node, try nm.getRight(node_d));
                 } else {
                     // Only store the left node if it's at d = diffDepth
                     left_parent_node_stack[d] = node;
-                    node = parent_nodes_stack[d];
+                    node = node_d;
                 }
             } else {
                 const left_node_or_null = left_parent_node_stack[d];
@@ -344,7 +344,8 @@ pub fn setNodesAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usi
                     left_parent_node_stack[d] = null;
                 } else {
                     const old_node = node;
-                    node = try pool.newBranch(try nm.getLeft(parent_nodes_stack[d]), old_node);
+                    const node_d = parent_nodes_stack[d] orelse return error.IncorrectParentNode;
+                    node = try pool.newBranch(try nm.getLeft(node_d), old_node);
                 }
             }
         }
@@ -376,7 +377,7 @@ pub fn getNodesAtDepth(root_node: *const Node, depth: usize, start_index: usize,
             if (out.len == 0) {
                 return error.Out_Nodes_Too_Small;
             }
-            out[0] = root_node;
+            out[0] = @constCast(root_node);
             return 1;
         } else {
             return 0;
@@ -388,7 +389,8 @@ pub fn getNodesAtDepth(root_node: *const Node, depth: usize, start_index: usize,
             if (out.len == 0) {
                 return error.Out_Nodes_Too_Small;
             }
-            return if (start_index == 0) try nm.getLeft(root_node) else try nm.getRight(root_node);
+            out[0] = if (start_index == 0) try nm.getLeft(root_node) else try nm.getRight(root_node);
+            return 1;
         } else {
             // 2 nodes
             if (out.len < 2) {
@@ -404,15 +406,15 @@ pub fn getNodesAtDepth(root_node: *const Node, depth: usize, start_index: usize,
     const depthi_root: usize = depth - 1;
     const depthi_parent: usize = 0;
     var depthi = depthi_root;
-    var node: *Node = root_node;
+    var node: *Node = @constCast(root_node);
 
     // Contiguous filled stack of parent nodes. It get filled in the first descent
     // Indexed by depthi
-    var parent_nodes_stack: [MAX_NODES_DEPTH]*Node = undefined;
-    var is_left_stack: [MAX_NODES_DEPTH]bool = undefined;
+    var parent_nodes_stack = [_]?*Node{undefined} ** MAX_NODES_DEPTH;
+    var is_left_stack = [_]bool{false} ** MAX_NODES_DEPTH;
 
     // Insert root node to make the loop below general
-    parent_nodes_stack[depthi_root] = root_node;
+    parent_nodes_stack[depthi_root] = @constCast(root_node);
 
     for (0..count) |i| {
         var d = depthi;
@@ -422,8 +424,14 @@ pub fn getNodesAtDepth(root_node: *const Node, depth: usize, start_index: usize,
             }
 
             const is_left = isLeftNode(d, start_index + i);
+
             is_left_stack[d] = is_left;
             node = if (is_left) try nm.getLeft(node) else try nm.getRight(node);
+
+            // avoid integer overflow
+            if (d == 0) {
+                break;
+            }
         }
 
         out[i] = node;
@@ -431,14 +439,20 @@ pub fn getNodesAtDepth(root_node: *const Node, depth: usize, start_index: usize,
         // Find the first depth where navigation when left.
         // Store that height and go right from there
         for (depthi_parent..(depthi_root + 1)) |d2| {
-            if (is_left_stack(d2)) {
-                depthi = depth;
+            if (is_left_stack[d2]) {
+                depthi = d2;
                 break;
             }
         }
 
-        node = parent_nodes_stack[depthi];
+        if (parent_nodes_stack[depthi]) |node_depth_i| {
+            node = node_depth_i;
+        } else {
+            return error.IncorrectParentNode;
+        }
     }
+
+    return count;
 }
 
 /// TODO: iterateNodesAtDepth() returns IterableIterator<Node> in typescript
@@ -485,7 +499,7 @@ pub fn treeZeroAfterIndex(pool: *NodePool, root_node: *const Node, nodes_depth: 
 
     // Contiguous filled stack of parent nodes. It get filled in the first descent
     // Indexed by depthi
-    var parent_nodes_stack: [MAX_NODES_DEPTH]*Node = undefined;
+    var parent_nodes_stack = [_]?*Node{undefined} ** MAX_NODES_DEPTH;
 
     // Ignore first bit "1", then substract 1 to get to the parent
     const depthi_root = nodes_depth - 1;
@@ -517,8 +531,8 @@ pub fn treeZeroAfterIndex(pool: *NodePool, root_node: *const Node, nodes_depth: 
         } else {
             // If navigated to the right, then all the child nodes of the left node are part of the new tree.
             // So re-bind new `node` with the existing left node of the parent.
-            // node = new BranchNode(parentNodeStack[d].left, node);
-            node = try pool.newBranch(try nm.getLeft(parent_nodes_stack[d2]), node);
+            const node_d2 = parent_nodes_stack[d2] orelse return error.IncorrectParentNode;
+            node = try pool.newBranch(try nm.getLeft(node_d2), node);
         }
     }
 
@@ -604,10 +618,28 @@ fn getParentNodes(out: []*Node, root_node: *Node, bit_array: []bool) !void {
     }
 }
 
-// TODO: implement a Tree
-// - getRoot
-// - unref
-// - clone
+test "should properly navigate the zero tree" {
+    const allocator = std.testing.allocator;
+    var pool = try NodePool.init(allocator, 32);
+    defer pool.deinit();
+    const depth = 4;
+    const zero_node = try pool.getZeroNode(0);
+    const zero_root = nm.getRoot(zero_node);
+    const zero_node_depth = try pool.getZeroNode(depth);
+    const tree = pool.getTree(zero_node_depth);
+
+    var nodes_arr = [_]*Node{zero_node} ** depth;
+    const nodes = nodes_arr[0..];
+
+    const count = try tree.getTreeNodesAtDepth(depth, 0, depth, nodes);
+
+    try expect(count == 4);
+    for (nodes) |node| {
+        const root = nm.getRoot(node);
+        try std.testing.expectEqualSlices(u8, zero_root.*[0..], root.*[0..]);
+    }
+}
+
 test "setNode" {
     const allocator = std.testing.allocator;
     var pool = try NodePool.init(allocator, 32);
