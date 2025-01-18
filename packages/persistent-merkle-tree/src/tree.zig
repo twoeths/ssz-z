@@ -7,6 +7,7 @@ const NodePool = @import("./pool.zig").NodePool;
 const MAX_NODES_DEPTH = @import("./const.zig").MAX_NODES_DEPTH;
 const util = @import("./util.zig");
 const toRootHex = @import("util").toRootHex;
+const rootIntoHex = @import("util").rootIntoHex;
 
 pub const TreeError = nm.NodeError || error{ TooFewBits, InvalidArgument } || Allocator.Error;
 
@@ -72,7 +73,7 @@ pub const Tree = struct {
 
     /// Return the node at the specified gindex.
     pub fn getTreeNode(self: *const Tree, gindex: u64) !*Node {
-        return try getNode(self._root_node, gindex);
+        return try getNodeMut(self._root_node, gindex);
     }
 
     /// Return the node at the specified depth and index.
@@ -102,7 +103,7 @@ pub const Tree = struct {
     pub fn setTreeNodeWithFn(self: *Tree, gindex: u64, getNewNode: fn (*Node) *Node) !void {
         const old_root = self._root_node;
         const new_root = try setNodeWithFn(self.pool, old_root, gindex, getNewNode);
-        self.setRootNode(new_root);
+        try self.setRootNode(new_root);
     }
 
     /// Set the node at the specified depth and index.
@@ -110,7 +111,14 @@ pub const Tree = struct {
     pub fn setTreeNodeAtDepth(self: *Tree, depth: usize, index: usize, node: *Node) !void {
         const old_root = self._root_node;
         const new_root = try setNodeAtDepth(self.pool, old_root, depth, index, node);
-        self.setRootNode(new_root);
+        try self.setRootNode(new_root);
+    }
+
+    pub fn setTreeNodesAtDepth(self: *Tree, nodes_depth: usize, indexes: []usize, nodes: []*Node) !*Node {
+        const old_root = self._root_node;
+        const new_root = try setNodesAtDepth(self.pool, old_root, nodes_depth, indexes, nodes);
+        try self.setRootNode(new_root);
+        return new_root;
     }
 
     /// Set the hash at the specified gindex.
@@ -157,7 +165,7 @@ pub fn getNodeMut(root_node: *const Node, gindex: u64) !*Node {
 
 pub fn setNode(pool: *NodePool, root_node: *const Node, gindex: u64, n: *Node) TreeError!*Node {
     var all_bit_array = [_]bool{false} ** MAX_NODES_DEPTH;
-    const num_bits = try util.populateBitArray(all_bit_array[0..gindex], gindex);
+    const num_bits = try util.populateBitArray(all_bit_array[0..], gindex);
     var array_parent_nodes = [_]*Node{n} ** MAX_NODES_DEPTH;
     const parent_nodes = array_parent_nodes[0..num_bits];
     const bit_array = all_bit_array[0..num_bits];
@@ -269,6 +277,15 @@ pub fn setNodesAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usi
     const depth_i_parent = 0;
     var depth_i = depth_i_root;
     var node: *Node = @constCast(root_node);
+    parent_nodes_stack[depth_i_root] = @constCast(root_node);
+
+    errdefer {
+        if (node != root_node) {
+            // return the in-progress root to the pool
+            // without this we'll lose access to in-progress nodes and leak memory
+            pool.unref(node) catch {};
+        }
+    }
 
     // Insert root node to make the loop below general
     // parent_nodes_stack[depth_i_root] = node;
@@ -309,7 +326,7 @@ pub fn setNodesAtDepth(pool: *NodePool, root_node: *const Node, nodes_depth: usi
         const is_left_leaf_node = (index & 1) != 1;
         if (is_left_leaf_node) {
             // Next node is the very next to the right of current node
-            if (index + 1 == indexes[i + 1]) {
+            if ((i < indexes.len - 1) and index + 1 == indexes[i + 1]) {
                 node = try pool.newBranch(nodes[i], nodes[i + 1]);
                 // Move pointer one extra forward since node has consumed two nodes
                 i += 1;
@@ -682,6 +699,10 @@ test "subtree mutation - changing a subtree should change the parent root" {
     const depth = 2;
     const zero_node = try pool.getZeroNode(depth);
     var tree = pool.getTree(zero_node);
+    // clean up
+    defer {
+        tree.unref() catch {};
+    }
 
     // Get the subtree with "X"s
     //       0
@@ -697,9 +718,6 @@ test "subtree mutation - changing a subtree should change the parent root" {
     const root_after = tree.getRoot();
     // expectEqualSlices should be false, usually the 1st u8 changed
     try expect(root_before.*[0] != root_after.*[0]);
-
-    // clean up
-    try tree.unref();
 }
 
 test "setNode" {
@@ -725,6 +743,10 @@ test "setNode" {
         const zero_node = try pool.getZeroNode(depth);
         // var tree = Tree{ .pool = &pool, .root_node = zero_node };
         var tree = pool.getTree(zero_node);
+        defer {
+            tree.unref() catch {};
+        }
+
         const leaf_node = try pool.newLeaf(&[_]u8{2} ** 32);
         try tree.setTreeNode(18, leaf_node);
         try tree.setTreeNode(46, leaf_node);
@@ -732,9 +754,90 @@ test "setNode" {
         const root = tree.getRoot();
         const root_hex = try toRootHex(root[0..]);
         try std.testing.expectEqualSlices(u8, "0x02607e58782c912e2f96f4ff9daf494d0d115e7c37e8c2b7ddce17213591151b", root_hex);
+    }
+}
 
-        // clean up
-        try tree.unref();
+test "Tree batch setNodes" {
+    const TestCase = struct {
+        depth: usize,
+        gindexes: []const u64,
+    };
+
+    const tcs = [_]TestCase{
+        .{ .depth = 1, .gindexes = &.{2} },
+        .{ .depth = 1, .gindexes = &.{ 2, 3 } },
+        .{ .depth = 2, .gindexes = &.{4} },
+        .{ .depth = 2, .gindexes = &.{6} },
+        .{ .depth = 2, .gindexes = &.{ 4, 6 } },
+        .{ .depth = 3, .gindexes = &.{9} },
+        .{ .depth = 3, .gindexes = &.{12} },
+        .{ .depth = 3, .gindexes = &.{ 9, 10 } },
+        .{ .depth = 3, .gindexes = &.{ 13, 14 } },
+        .{ .depth = 3, .gindexes = &.{ 13, 14 } },
+        .{ .depth = 3, .gindexes = &.{ 9, 10, 13, 14 } },
+        .{ .depth = 3, .gindexes = &.{ 8, 9, 10, 11, 12, 13, 14, 15 } },
+        .{ .depth = 4, .gindexes = &.{16} },
+        .{ .depth = 4, .gindexes = &.{ 16, 17 } },
+        .{ .depth = 4, .gindexes = &.{ 16, 17 } },
+        .{ .depth = 4, .gindexes = &.{ 16, 20 } },
+        .{ .depth = 4, .gindexes = &.{ 16, 20, 30 } },
+        .{ .depth = 4, .gindexes = &.{ 16, 20, 30, 31 } },
+        .{ .depth = 5, .gindexes = &.{33} },
+        .{ .depth = 5, .gindexes = &.{34} },
+        // .{ .depth = 10, .gindexes = &.{ 1024, 1061, 1098, 1135, 1172, 1209, 1246, 1283 } },
+    };
+
+    const allocator = std.testing.allocator;
+    var pool = try NodePool.init(allocator, 32);
+    defer pool.deinit();
+
+    inline for (tcs[0..]) |tc| {
+        const depth = tc.depth;
+        const gindexes = tc.gindexes;
+
+        // Prepare tree
+        var tree_ok = pool.getTree(try pool.getZeroNode(depth));
+        // cache all roots
+        _ = tree_ok.getRoot();
+        var tree = pool.getTree(try pool.getZeroNode(depth));
+        _ = tree.getRoot();
+
+        defer {
+            // clean up
+            tree_ok.unref() catch {};
+            tree.unref() catch {};
+        }
+
+        const index0 = std.math.pow(u64, 2, depth);
+        var indices = [_]usize{0} ** gindexes.len;
+        for (gindexes, 0..) |gindex, i| {
+            indices[i] = @intCast(gindex - index0);
+        }
+
+        // we can reuse the nodes but want to do the same to typescript's test here
+        var nodes_ok: [gindexes.len]*Node = undefined;
+        var nodes: [gindexes.len]*Node = undefined;
+        for (gindexes, 0..) |gindex, i| {
+            var root = [_]u8{@intCast(gindex % 256)} ** 32;
+            nodes_ok[i] = try pool.newLeaf(&root);
+            nodes[i] = try pool.newLeaf(&root);
+            try tree_ok.setTreeNode(gindex, nodes_ok[i]);
+        }
+
+        // For the large test cases, only compare the rootNode root (gindex 1)
+        const max_gindex = comptime if (depth > 6) 1 else std.math.pow(u64, 2, (depth + 1));
+        var hexes_ok: [max_gindex - 1][66]u8 = undefined;
+        _ = try _getTreeRoots(&tree_ok, max_gindex, hexes_ok[0..]);
+
+        _ = try tree.setTreeNodesAtDepth(depth, indices[0..], nodes[0..]);
+
+        for (1..max_gindex) |i| {
+            const node = try tree.getTreeNode(i);
+            const root = nm.getRoot(node);
+            var hex = [_]u8{0} ** 66;
+            try rootIntoHex(hex[0..], root);
+            try std.testing.expectEqualSlices(u8, hexes_ok[i - 1][0..], hex[0..]);
+        }
     }
 }
 
@@ -779,5 +882,19 @@ test "findDiffDepthi" {
     for (tcs) |tc| {
         const result = try findDiffDepthi(tc.index0, tc.index1);
         try expect(result == tc.expected);
+    }
+}
+
+/// test util
+/// extract root hexes from tree
+fn _getTreeRoots(tree: *const Tree, max_gindex: u64, out: [][66]u8) !void {
+    if (out.len != max_gindex - 1) {
+        return error.InvalidArgument;
+    }
+
+    for (1..max_gindex) |i| {
+        const node = try tree.getTreeNode(i);
+        const root = nm.getRoot(node);
+        try rootIntoHex(out[i - 1][0..], root);
     }
 }
