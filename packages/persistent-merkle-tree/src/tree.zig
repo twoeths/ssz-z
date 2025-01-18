@@ -784,7 +784,11 @@ test "Tree batch setNodes" {
         .{ .depth = 4, .gindexes = &.{ 16, 20, 30, 31 } },
         .{ .depth = 5, .gindexes = &.{33} },
         .{ .depth = 5, .gindexes = &.{34} },
-        // .{ .depth = 10, .gindexes = &.{ 1024, 1061, 1098, 1135, 1172, 1209, 1246, 1283 } },
+        .{ .depth = 10, .gindexes = &.{ 1024, 1061, 1098, 1135, 1172, 1209, 1246, 1283 } },
+        // .{.depth = 40, .gindexes = &.{std.math.pow(u64, 2, 40) + 1000, std.math.pow(u64, 2, 40) + 1_000_000, std.math.pow(u64, 2, 40) + 1_000_000_000}}
+        // Math.pow(2, 40) = 1099511627776
+        .{ .depth = 40, .gindexes = &.{ 1099511627776 + 1000, 1099511627776 + 1_000_000, 1099511627776 + 1_000_000_000 } },
+        .{ .depth = 40, .gindexes = &.{ 1157505940782, 1349082402477, 1759777921993 } },
     };
 
     const allocator = std.testing.allocator;
