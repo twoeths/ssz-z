@@ -28,6 +28,19 @@ pub fn toRootHex(root: []const u8) ![]u8 {
     return buffer[0..];
 }
 
+pub fn rootIntoHex(out: []u8, root: []const u8) !void {
+    if (root.len != 32) {
+        return error.InvalidInput;
+    }
+
+    if (out.len != 66) {
+        return error.InvalidOutputLength;
+    }
+
+    const hex = try toRootHex(root);
+    @memcpy(out, hex);
+}
+
 pub fn fromHex(hex: []const u8, out: []u8) !void {
     if (hex.len == 0) {
         return;
