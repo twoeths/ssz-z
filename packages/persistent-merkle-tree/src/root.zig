@@ -10,6 +10,9 @@ pub const getZeroHash = zero_hash.getZeroHash;
 pub const deinitZeroHash = zero_hash.deinitZeroHash;
 pub const sha256Hash = @import("./sha256.zig").sha256Hash;
 pub const HashError = @import("./sha256.zig").HashError;
+pub const NodePool = @import("./pool.zig").NodePool;
+pub const Tree = @import("./tree.zig").Tree;
+// TODO: publish more apis inside Tree if needed
 
 test {
     testing.refAllDecls(@This());

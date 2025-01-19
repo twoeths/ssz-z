@@ -2,10 +2,10 @@ const std = @import("std");
 const digest64Into = @import("./sha256.zig").digest64Into;
 
 pub const ZeroHash = struct {
-    allocator: *std.mem.Allocator,
+    allocator: *const std.mem.Allocator,
     zero_hashes: []?[32]u8,
 
-    pub fn init(allocator: *std.mem.Allocator, max_depth: usize) !ZeroHash {
+    pub fn init(allocator: *const std.mem.Allocator, max_depth: usize) !ZeroHash {
         var hashes = try allocator.alloc(?[32]u8, max_depth + 1);
         // Use indexing to assign `null` to each element
         for (0..hashes.len) |i| {
@@ -41,13 +41,13 @@ pub const ZeroHash = struct {
 // Thread-local instance of `?ZeroHash`
 threadlocal var instance: ?ZeroHash = null;
 
-pub fn initZeroHash(allocator: *std.mem.Allocator, max_depth: usize) !void {
+pub fn initZeroHash(allocator: *const std.mem.Allocator, max_depth: usize) !void {
     if (instance == null) {
         instance = try ZeroHash.init(allocator, max_depth);
     }
 }
 
-pub fn getZeroHash(depth: usize) !*[32]u8 {
+pub fn getZeroHash(depth: usize) !*const [32]u8 {
     if (instance == null) {
         return error.noInitZeroHash;
     }
@@ -74,4 +74,14 @@ test "ZeroHash" {
     };
     try std.testing.expectEqualSlices(u8, hash[0..], expected_hash[0..]);
     // std.debug.print("Hash value: {any}\n", .{hash});
+}
+
+test "memory allocation" {
+    var allocator = std.testing.allocator;
+    try initZeroHash(&allocator, 64);
+    defer deinitZeroHash();
+
+    for (0..64) |i| {
+        _ = try getZeroHash(i);
+    }
 }
