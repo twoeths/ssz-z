@@ -14,6 +14,13 @@ const Tree = @import("./tree.zig").Tree;
 
 const LeafList = ArrayList(*Node);
 const BranchList = ArrayList(*Node);
+
+/// Nodes are created by the pool and reused to minimize memory allocations. When a node is no longer needed, you should call the `unref()` method, which decreases the node's reference count.
+/// - Reference Counting: Each node tracks its usage with a reference count. When the count reaches zero, the node is returned to the pool.
+/// - Reusability: Returned nodes are stored in the pool's LeafList and BranchList, making them available for reuse. This significantly reduces the need for frequent memory allocation during the application's lifetime.
+/// - Memory Allocation: A single allocator is managed within the pool, simplifying memory management across the API. When trees are no longer in use, nodes should be returned to the pool via the `unref()` method. The pool will then handle cleanup and deallocate memory when required.
+///
+/// This design ensures efficient memory usage and optimal performance, especially in applications where nodes are frequently created and discarded.
 pub const NodePool = struct {
     leaf_nodes: LeafList,
     branch_nodes: BranchList,
@@ -66,10 +73,12 @@ pub const NodePool = struct {
         nm.destroyNode(self.allocator, self.place_holder);
     }
 
+    /// get tree from root node
     pub fn getTree(self: *NodePool, root: *Node) Tree {
         return Tree{ ._root_node = root, .pool = self, .parent = null };
     }
 
+    /// create new leaf node, if there is any in the pool, reuse it
     pub fn newLeaf(self: *NodePool, hash: *const [32]u8) !*Node {
         const nodeOrNull = self.leaf_nodes.popOrNull();
         if (nodeOrNull) |node| {
@@ -90,6 +99,7 @@ pub const NodePool = struct {
         return node;
     }
 
+    /// create new branch node, if there is any in the pool, reuse it
     /// cannot make left and right as const since we may modify its ref_count
     pub fn newBranch(self: *NodePool, left: *Node, right: *Node) nm.NodeError!*Node {
         const nodeOrNull = self.branch_nodes.popOrNull();
@@ -116,6 +126,7 @@ pub const NodePool = struct {
         return node;
     }
 
+    /// get zero node at depth
     pub fn getZeroNode(self: *const NodePool, depth: usize) !*Node {
         if (depth >= MAX_NODES_DEPTH) {
             return error.OutOfBounds;
@@ -123,6 +134,7 @@ pub const NodePool = struct {
         return self.zero_list[depth];
     }
 
+    /// decrease ref_count of node, if ref_count is 0, put it back to pool
     pub fn unref(self: *NodePool, node: *Node) Allocator.Error!void {
         switch (node.*) {
             .Leaf => {

@@ -142,6 +142,7 @@ pub const Tree = struct {
     // TODO: getSingleProof
     // TODO: getProof
 
+    /// unreferece the root node to possibly return it to the pool
     pub fn unref(self: *Tree) !void {
         try self.pool.unref(self._root_node);
     }
