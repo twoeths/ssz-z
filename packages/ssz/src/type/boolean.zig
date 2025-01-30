@@ -20,6 +20,10 @@ pub const BooleanType = struct {
         return bool;
     }
 
+    pub fn getViewDUType() type {
+        return bool;
+    }
+
     pub fn getZigTypeAlignment() usize {
         return 1;
     }

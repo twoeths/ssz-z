@@ -12,6 +12,10 @@ const JsonError = @import("./common.zig").JsonError;
 const SszError = @import("./common.zig").SszError;
 const HashError = @import("./common.zig").HashError;
 const Parsed = @import("./type.zig").Parsed;
+const Node = @import("hash").Node;
+const getNodeAtDepth = @import("hash").getNodeAtDepth;
+const maxChunksToDepth = @import("hash").maxChunksToDepth;
+const NodePool = @import("hash").NodePool;
 
 const BytesRange = struct {
     start: usize,
@@ -43,6 +47,118 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
         };
     }
 
+    const max_chunk_count = ssz_struct_info.fields.len;
+    const depth = maxChunksToDepth(max_chunk_count);
+    const viewdu_fixed_field_count = 2;
+
+    comptime var new_viewdu_fields: [ssz_struct_info.fields.len + viewdu_fixed_field_count]std.builtin.Type.StructField = undefined;
+    new_viewdu_fields[0] = .{
+        .name = "root_node",
+        .type = *Node,
+        .default_value = null,
+        .is_comptime = false,
+        // size of a pointer
+        .alignment = 8,
+    };
+
+    new_viewdu_fields[1] = .{
+        .name = "nodes",
+        .type = []?*Node,
+        .default_value = null,
+        .is_comptime = false,
+        // size of a pointer
+        .alignment = 8,
+    };
+
+    inline for (ssz_struct_info.fields, 0..) |field, i| {
+        // basic types don't have specific ViewDU type
+        // composite types have ViewDU type
+        const viewdu_type = field.type.getViewDUType();
+        const wrapped_viewdu_type = struct {
+            value: ?*viewdu_type,
+            pub fn init() @This() {
+                return @This(){
+                    .value = null,
+                };
+            }
+
+            // no get() set() for basic types
+        };
+
+        new_viewdu_fields[i + viewdu_fixed_field_count] = .{
+            .name = field.name,
+            .type = *wrapped_viewdu_type,
+            .default_value = null,
+            .is_comptime = false,
+            // size of a pointer
+            .alignment = 8,
+        };
+    }
+
+    const BaseViewDUType = comptime @Type(.{
+        .Struct = .{
+            .layout = .auto,
+            .backing_integer = null,
+            .fields = new_viewdu_fields[0..],
+            .decls = &[_]std.builtin.Type.Declaration{},
+            .is_tuple = false,
+        },
+    });
+
+    // overwrite the above fields
+    inline for (ssz_struct_info.fields, 0..) |field, i| {
+        // basic types don't have specific ViewDU type
+        // composite types have ViewDU type
+        const viewdu_type = field.type.getViewDUType();
+        const wrapped_viewdu_type = struct {
+            value: ?*viewdu_type,
+            pub fn init() @This() {
+                return @This(){
+                    .value = null,
+                };
+            }
+
+            pub fn get(self: *const @This()) *viewdu_type {
+                if (self.value) |value| {
+                    return value;
+                }
+                // TODO: not sure if this works as technically self belongs to ViewDUType not BaseViewDUType
+                // but ViewDUType is not available at this time
+                const parent: *BaseViewDUType = @fieldParentPtr(field.name, self);
+                var node = parent.nodes[i];
+                if (node == null) {
+                    node = getNodeAtDepth(parent.root_node, depth, i);
+                    parent.nodes[i] = node;
+                }
+                self.value = &field.type.getViewDU(node);
+                return self.value;
+            }
+
+            pub fn set(self: *@This(), v: *viewdu_type) void {
+                self.value = v;
+            }
+        };
+
+        new_viewdu_fields[i + viewdu_fixed_field_count] = .{
+            .name = field.name,
+            .type = *wrapped_viewdu_type,
+            .default_value = null,
+            .is_comptime = false,
+            // size of a pointer
+            .alignment = 8,
+        };
+    }
+
+    const ViewDUType = comptime @Type(.{
+        .Struct = .{
+            .layout = .auto,
+            .backing_integer = null,
+            .fields = new_viewdu_fields[0..],
+            .decls = &[_]std.builtin.Type.Declaration{},
+            .is_tuple = false,
+        },
+    });
+
     // this works for Zig 0.13
     // syntax in 0.14 or later could change, see https://github.com/ziglang/zig/issues/10710
     const ZT = comptime @Type(.{
@@ -57,7 +173,6 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
     });
 
     const zig_fields_info = @typeInfo(ZT).Struct.fields;
-    const max_chunk_count = zig_fields_info.len;
     const native_endian = @import("builtin").target.cpu.arch.endian();
     const SingleType = @import("./single.zig").withType(ZT);
     const ParsedResult = Parsed(ZT);
@@ -77,6 +192,29 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
         /// Zig Type definition
         pub fn getZigType() type {
             return ZT;
+        }
+
+        pub fn getViewDUType() type {
+            return ViewDUType;
+        }
+
+        pub fn getViewDU(node: *Node) ViewDUType {
+            // TODO: an init function?
+            var nodes = [_]?*Node{null} ** max_chunk_count;
+            var viewdu: ViewDUType = undefined;
+            @field(viewdu, "root_node") = node;
+            @field(viewdu, "nodes") = nodes[0..];
+            inline for (new_viewdu_fields, 0..) |field, i| {
+                // this type is *wrapped_viewdu_type
+                const ptr_type = field.type;
+                const wrapped_viewdu_type = @typeInfo(ptr_type).Pointer.child;
+                if (i >= viewdu_fixed_field_count) {
+                    var default_viewdu = wrapped_viewdu_type.init();
+                    @field(viewdu, field.name) = &default_viewdu;
+                }
+            }
+
+            return viewdu;
         }
 
         /// to be used by parent
@@ -436,6 +574,21 @@ test "basic ContainerType {x: uint, y:bool}" {
     defer parsed.deinit();
     try expect(parsed.value.x == obj.x);
     try expect(parsed.value.y == obj.y);
+
+    // // viewDU
+    // var pool = try NodePool.init(allocator, 10);
+    // defer pool.deinit();
+    // var hash1: [32]u8 = [_]u8{0} ** 32;
+    // hash1[0] = 1;
+    // var hash2: [32]u8 = [_]u8{0} ** 32;
+    // hash2[0] = 1;
+    // const leaf1 = try pool.newLeaf(&hash1);
+    // const leaf2 = try pool.newLeaf(&hash2);
+    // const root_node = try pool.newBranch(leaf1, leaf2);
+    // const viewdu = ContainerType.getViewDU(root_node);
+    // std.debug.print("@@@ viewdu x: {any}\n", .{viewdu.x.get()});
+    // std.debug.print("@@@ viewdu y: {any}\n", .{viewdu.y.get()});
+    // try pool.unref(root_node);
 }
 
 test "ContainerType with embedded struct" {

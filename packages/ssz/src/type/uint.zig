@@ -38,6 +38,10 @@ pub fn createUintType(comptime num_bytes: usize) type {
             return T;
         }
 
+        pub fn getViewDUType() type {
+            return T;
+        }
+
         pub fn getZigTypeAlignment() usize {
             return num_bytes;
         }

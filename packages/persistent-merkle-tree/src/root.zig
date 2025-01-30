@@ -12,6 +12,8 @@ pub const sha256Hash = @import("./sha256.zig").sha256Hash;
 pub const HashError = @import("./sha256.zig").HashError;
 pub const NodePool = @import("./pool.zig").NodePool;
 pub const Tree = @import("./tree.zig").Tree;
+pub const getNodeAtDepth = @import("./tree.zig").getNodeAtDepth;
+pub const Node = @import("./node.zig").Node;
 // TODO: publish more apis inside Tree if needed
 
 test {
