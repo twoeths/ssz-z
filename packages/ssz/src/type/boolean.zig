@@ -7,6 +7,8 @@ const JsonError = @import("./common.zig").JsonError;
 const SszError = @import("./common.zig").SszError;
 const HashError = @import("./common.zig").HashError;
 const SingleType = @import("./single.zig").withType(bool);
+const Node = @import("hash").Node;
+const getRoot = @import("hash").getRoot;
 
 pub const BooleanType = struct {
     byte_len: usize,
@@ -22,6 +24,18 @@ pub const BooleanType = struct {
 
     pub fn getViewDUType() type {
         return bool;
+    }
+
+    /// public api
+    pub fn getViewDU(node: *Node) bool {
+        const root = getRoot(node);
+        // TODO: check typescript's implementation
+        return root[0] != 0;
+    }
+
+    /// recursive function
+    pub fn allocateViewDU(_: Allocator, node: *Node) bool {
+        return @This().getViewDU(node);
     }
 
     pub fn getZigTypeAlignment() usize {

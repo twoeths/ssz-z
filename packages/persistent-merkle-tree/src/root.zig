@@ -14,6 +14,7 @@ pub const NodePool = @import("./pool.zig").NodePool;
 pub const Tree = @import("./tree.zig").Tree;
 pub const getNodeAtDepth = @import("./tree.zig").getNodeAtDepth;
 pub const Node = @import("./node.zig").Node;
+pub const getRoot = @import("./node.zig").getRoot;
 // TODO: publish more apis inside Tree if needed
 
 test {

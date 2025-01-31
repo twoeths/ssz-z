@@ -49,7 +49,7 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
 
     const max_chunk_count = ssz_struct_info.fields.len;
     const depth = maxChunksToDepth(max_chunk_count);
-    const viewdu_fixed_field_count = 2;
+    const viewdu_fixed_field_count = 3;
 
     comptime var new_viewdu_fields: [ssz_struct_info.fields.len + viewdu_fixed_field_count]std.builtin.Type.StructField = undefined;
     new_viewdu_fields[0] = .{
@@ -57,8 +57,7 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
         .type = *Node,
         .default_value = null,
         .is_comptime = false,
-        // size of a pointer
-        .alignment = 8,
+        .alignment = @alignOf(*Node),
     };
 
     new_viewdu_fields[1] = .{
@@ -66,40 +65,22 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
         .type = []?*Node,
         .default_value = null,
         .is_comptime = false,
-        // size of a pointer
-        .alignment = 8,
+        .alignment = @alignOf([]?*Node),
     };
 
-    inline for (ssz_struct_info.fields, 0..) |field, i| {
-        // basic types don't have specific ViewDU type
-        // composite types have ViewDU type
-        const viewdu_type = field.type.getViewDUType();
-        const wrapped_viewdu_type = struct {
-            value: ?*viewdu_type,
-            pub fn init() @This() {
-                return @This(){
-                    .value = null,
-                };
-            }
+    new_viewdu_fields[2] = .{
+        .name = "allocator",
+        .type = std.mem.Allocator,
+        .default_value = null,
+        .is_comptime = false,
+        .alignment = @alignOf(std.mem.Allocator),
+    };
 
-            // no get() set() for basic types
-        };
-
-        new_viewdu_fields[i + viewdu_fixed_field_count] = .{
-            .name = field.name,
-            .type = *wrapped_viewdu_type,
-            .default_value = null,
-            .is_comptime = false,
-            // size of a pointer
-            .alignment = 8,
-        };
-    }
-
-    const BaseViewDUType = comptime @Type(.{
+    const BasicContainerTreeViewDU = comptime @Type(.{
         .Struct = .{
             .layout = .auto,
             .backing_integer = null,
-            .fields = new_viewdu_fields[0..],
+            .fields = new_viewdu_fields[0..viewdu_fixed_field_count],
             .decls = &[_]std.builtin.Type.Declaration{},
             .is_tuple = false,
         },
@@ -111,30 +92,31 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
         // composite types have ViewDU type
         const viewdu_type = field.type.getViewDUType();
         const wrapped_viewdu_type = struct {
-            value: ?*viewdu_type,
-            pub fn init() @This() {
-                return @This(){
-                    .value = null,
-                };
+            value: ?viewdu_type,
+            parent: *BasicContainerTreeViewDU,
+
+            pub fn init(arena_allocator: Allocator, parent: *BasicContainerTreeViewDU) !*@This() {
+                const instance = try arena_allocator.create(@This());
+                instance.value = null;
+                instance.parent = parent;
+                return instance;
             }
 
-            pub fn get(self: *const @This()) *viewdu_type {
+            pub fn get(self: *@This()) !viewdu_type {
                 if (self.value) |value| {
                     return value;
                 }
-                // TODO: not sure if this works as technically self belongs to ViewDUType not BaseViewDUType
-                // but ViewDUType is not available at this time
-                const parent: *BaseViewDUType = @fieldParentPtr(field.name, self);
-                var node = parent.nodes[i];
+                var node = self.parent.nodes[i];
                 if (node == null) {
-                    node = getNodeAtDepth(parent.root_node, depth, i);
-                    parent.nodes[i] = node;
+                    node = @constCast(try getNodeAtDepth(@constCast(self.parent.root_node), depth, i));
+                    self.parent.nodes[i] = node;
                 }
-                self.value = &field.type.getViewDU(node);
-                return self.value;
+                const value = field.type.allocateViewDU(self.parent.allocator, node.?);
+                self.value = value;
+                return value;
             }
 
-            pub fn set(self: *@This(), v: *viewdu_type) void {
+            pub fn set(self: *@This(), v: viewdu_type) void {
                 self.value = v;
             }
         };
@@ -149,7 +131,7 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
         };
     }
 
-    const ViewDUType = comptime @Type(.{
+    const ContainerTreeViewDU = comptime @Type(.{
         .Struct = .{
             .layout = .auto,
             .backing_integer = null,
@@ -176,6 +158,7 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
     const native_endian = @import("builtin").target.cpu.arch.endian();
     const SingleType = @import("./single.zig").withType(ZT);
     const ParsedResult = Parsed(ZT);
+    const ViewDUResult = Parsed(ContainerTreeViewDU);
 
     const ContainerType = struct {
         allocator: Allocator,
@@ -195,22 +178,41 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
         }
 
         pub fn getViewDUType() type {
-            return ViewDUType;
+            return *ContainerTreeViewDU;
         }
 
-        pub fn getViewDU(node: *Node) ViewDUType {
-            // TODO: an init function?
-            var nodes = [_]?*Node{null} ** max_chunk_count;
-            var viewdu: ViewDUType = undefined;
-            @field(viewdu, "root_node") = node;
-            @field(viewdu, "nodes") = nodes[0..];
+        /// public function for consumers
+        pub fn getViewDU(self: *const @This(), node: *Node) !ViewDUResult {
+            const arena = try self.allocator.create(ArenaAllocator);
+            arena.* = ArenaAllocator.init(self.allocator);
+            const allocator = arena.allocator();
+
+            // must destroy before deinit()
+            errdefer self.allocator.destroy(arena);
+            errdefer arena.deinit();
+            const viewdu = try @This().allocateViewDU(allocator, node);
+            return .{
+                .value = viewdu,
+                .arena = arena,
+            };
+        }
+
+        /// recursive function, it's a struct method which does not require an instance
+        pub fn allocateViewDU(arena_allocator: Allocator, node: *Node) !*ContainerTreeViewDU {
+            var viewdu = try arena_allocator.create(ContainerTreeViewDU);
+            viewdu.root_node = node;
+            viewdu.nodes = try arena_allocator.alloc(?*Node, max_chunk_count);
+            for (viewdu.nodes) |*n| {
+                n.* = null;
+            }
+            viewdu.allocator = arena_allocator;
+            const baseViewDU: *BasicContainerTreeViewDU = @ptrCast(viewdu);
             inline for (new_viewdu_fields, 0..) |field, i| {
                 // this type is *wrapped_viewdu_type
-                const ptr_type = field.type;
-                const wrapped_viewdu_type = @typeInfo(ptr_type).Pointer.child;
                 if (i >= viewdu_fixed_field_count) {
-                    var default_viewdu = wrapped_viewdu_type.init();
-                    @field(viewdu, field.name) = &default_viewdu;
+                    const ptr_type = field.type;
+                    const wrapped_viewdu_type = @typeInfo(ptr_type).Pointer.child;
+                    @field(viewdu, field.name) = try wrapped_viewdu_type.init(arena_allocator, baseViewDU);
                 }
             }
 
@@ -575,20 +577,21 @@ test "basic ContainerType {x: uint, y:bool}" {
     try expect(parsed.value.x == obj.x);
     try expect(parsed.value.y == obj.y);
 
-    // // viewDU
-    // var pool = try NodePool.init(allocator, 10);
-    // defer pool.deinit();
-    // var hash1: [32]u8 = [_]u8{0} ** 32;
-    // hash1[0] = 1;
-    // var hash2: [32]u8 = [_]u8{0} ** 32;
-    // hash2[0] = 1;
-    // const leaf1 = try pool.newLeaf(&hash1);
-    // const leaf2 = try pool.newLeaf(&hash2);
-    // const root_node = try pool.newBranch(leaf1, leaf2);
-    // const viewdu = ContainerType.getViewDU(root_node);
-    // std.debug.print("@@@ viewdu x: {any}\n", .{viewdu.x.get()});
-    // std.debug.print("@@@ viewdu y: {any}\n", .{viewdu.y.get()});
-    // try pool.unref(root_node);
+    // viewDU
+    var pool = try NodePool.init(allocator, 10);
+    defer pool.deinit();
+    var hash1: [32]u8 = [_]u8{0} ** 32;
+    hash1[0] = 1;
+    var hash2: [32]u8 = [_]u8{0} ** 32;
+    hash2[0] = 1;
+    const leaf1 = try pool.newLeaf(&hash1);
+    const leaf2 = try pool.newLeaf(&hash2);
+    const root_node = try pool.newBranch(leaf1, leaf2);
+    const viewdu_result = try containerType.getViewDU(root_node);
+    defer viewdu_result.deinit();
+    try expect(try viewdu_result.value.x.get() == 1);
+    try expect(try viewdu_result.value.y.get() == true);
+    try pool.unref(root_node);
 }
 
 test "ContainerType with embedded struct" {

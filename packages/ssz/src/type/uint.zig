@@ -8,6 +8,8 @@ const JsonError = @import("./common.zig").JsonError;
 const SszError = @import("./common.zig").SszError;
 const HashError = @import("./common.zig").HashError;
 const Parsed = @import("./type.zig").Parsed;
+const Node = @import("hash").Node;
+const getRoot = @import("hash").getRoot;
 
 pub fn createUintType(comptime num_bytes: usize) type {
     if (num_bytes != 1 and num_bytes != 2 and num_bytes != 4 and num_bytes != 8 and num_bytes != 16 and num_bytes != 32 and num_bytes != 64) {
@@ -40,6 +42,19 @@ pub fn createUintType(comptime num_bytes: usize) type {
 
         pub fn getViewDUType() type {
             return T;
+        }
+
+        /// public api
+        pub fn getViewDU(node: *Node) T {
+            const hash = getRoot(node);
+            const sliceT = std.mem.bytesAsSlice(T, hash[0..]);
+            const value = sliceT[0];
+            return if (native_endian == .big) @byteSwap(value) else value;
+        }
+
+        /// recursive function
+        pub fn allocateViewDU(_: Allocator, node: *Node) T {
+            return @This().getViewDU(node);
         }
 
         pub fn getZigTypeAlignment() usize {
