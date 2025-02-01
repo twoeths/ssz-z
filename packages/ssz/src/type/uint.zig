@@ -53,7 +53,7 @@ pub fn createUintType(comptime num_bytes: usize) type {
         }
 
         /// recursive function
-        pub fn allocateViewDU(_: Allocator, node: *Node) T {
+        pub fn allocateViewDU(_: Allocator, node: *Node) !T {
             return @This().getViewDU(node);
         }
 

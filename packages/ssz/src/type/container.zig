@@ -85,7 +85,7 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
                     node = @constCast(try getNodeAtDepth(@constCast(self.parent.root_node), depth, i));
                     self.parent.nodes[i] = node;
                 }
-                const value = field.type.allocateViewDU(self.parent.allocator, node.?);
+                const value = try field.type.allocateViewDU(self.parent.allocator, node.?);
                 self.value = value;
                 return value;
             }
@@ -571,6 +571,8 @@ test "basic ContainerType {x: uint, y:bool}" {
     // viewDU
     var pool = try NodePool.init(allocator, 10);
     defer pool.deinit();
+
+    // to be replaced by deserializeToViewDU()
     var hash1: [32]u8 = [_]u8{0} ** 32;
     hash1[0] = 1;
     var hash2: [32]u8 = [_]u8{0} ** 32;
@@ -659,4 +661,76 @@ test "ContainerType with embedded struct" {
     try expect(parsed.value.b.x == obj.b.x);
     try expect(parsed.value.b.y == obj.b.y);
     try expect(containerType1.equals(&obj, parsed.value));
+
+    // viewDU
+    var pool = try NodePool.init(allocator, 10);
+    defer pool.deinit();
+
+    // to be replaced by deserializeToViewDU()
+    var hash1: [32]u8 = [_]u8{0} ** 32;
+    hash1[0] = 11;
+    var hash2: [32]u8 = [_]u8{0} ** 32;
+    hash2[0] = 12;
+    var hash3: [32]u8 = [_]u8{0} ** 32;
+    hash3[0] = 21;
+    var hash4: [32]u8 = [_]u8{0} ** 32;
+    hash4[0] = 22;
+    const leaf1 = try pool.newLeaf(&hash1);
+    const leaf2 = try pool.newLeaf(&hash2);
+    const leaf3 = try pool.newLeaf(&hash3);
+    const leaf4 = try pool.newLeaf(&hash4);
+    const branch1 = try pool.newBranch(leaf1, leaf2);
+    const branch2 = try pool.newBranch(leaf3, leaf4);
+    const root_node = try pool.newBranch(branch1, branch2);
+    const viewdu_result = try containerType1.getViewDU(root_node);
+    defer viewdu_result.deinit();
+
+    const viewdu = viewdu_result.value;
+    const a_view = try viewdu.fields.a.get();
+    try expect(try a_view.fields.x.get() == 11);
+    try expect(try a_view.fields.y.get() == 12);
+
+    const b_view = try viewdu.fields.b.get();
+    try expect(try b_view.fields.x.get() == 21);
+    try expect(try b_view.fields.y.get() == 22);
+
+    // better way, use ptrCast to provide better DX
+    const WrappedViewDU = struct {
+        viewdu: ContainerType1.getViewDUType(),
+        pub fn getA(self: *const @This()) !ContainerType0.getViewDUType() {
+            return try self.viewdu.fields.a.get();
+        }
+
+        pub fn getB(self: *const @This()) !ContainerType0.getViewDUType() {
+            return try self.viewdu.fields.b.get();
+        }
+
+        pub fn getAX(self: *const @This()) !u64 {
+            const a_viewdu = try self.getA();
+            return try a_viewdu.fields.x.get();
+        }
+
+        pub fn getAY(self: *const @This()) !u64 {
+            const a_viewdu = try self.getA();
+            return try a_viewdu.fields.y.get();
+        }
+
+        pub fn getBX(self: *const @This()) !u64 {
+            const b_viewdu = try self.getB();
+            return try b_viewdu.fields.x.get();
+        }
+
+        pub fn getBY(self: *const @This()) !u64 {
+            const b_viewdu = try self.getB();
+            return try b_viewdu.fields.y.get();
+        }
+    };
+
+    const wrapped_viewdu: WrappedViewDU = .{ .viewdu = viewdu };
+    try expect(try wrapped_viewdu.getAX() == 11);
+    try expect(try wrapped_viewdu.getAY() == 12);
+    try expect(try wrapped_viewdu.getBX() == 21);
+    try expect(try wrapped_viewdu.getBY() == 22);
+
+    try pool.unref(root_node);
 }

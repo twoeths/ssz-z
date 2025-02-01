@@ -34,7 +34,7 @@ pub const BooleanType = struct {
     }
 
     /// recursive function
-    pub fn allocateViewDU(_: Allocator, node: *Node) bool {
+    pub fn allocateViewDU(_: Allocator, node: *Node) !bool {
         return @This().getViewDU(node);
     }
 
