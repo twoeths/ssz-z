@@ -49,48 +49,22 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
 
     const max_chunk_count = ssz_struct_info.fields.len;
     const depth = maxChunksToDepth(max_chunk_count);
-    const viewdu_fixed_field_count = 3;
 
-    comptime var new_viewdu_fields: [ssz_struct_info.fields.len + viewdu_fixed_field_count]std.builtin.Type.StructField = undefined;
-    new_viewdu_fields[0] = .{
-        .name = "root_node",
-        .type = *Node,
-        .default_value = null,
-        .is_comptime = false,
-        .alignment = @alignOf(*Node),
+    const BasicContainerTreeViewDU = struct {
+        root_node: *Node,
+        nodes: []?*Node,
+        allocator: Allocator,
     };
 
-    new_viewdu_fields[1] = .{
-        .name = "nodes",
-        .type = []?*Node,
-        .default_value = null,
-        .is_comptime = false,
-        .alignment = @alignOf([]?*Node),
-    };
+    comptime var new_viewdu_fields: [ssz_struct_info.fields.len]std.builtin.Type.StructField = undefined;
 
-    new_viewdu_fields[2] = .{
-        .name = "allocator",
-        .type = std.mem.Allocator,
-        .default_value = null,
-        .is_comptime = false,
-        .alignment = @alignOf(std.mem.Allocator),
-    };
-
-    const BasicContainerTreeViewDU = comptime @Type(.{
-        .Struct = .{
-            .layout = .auto,
-            .backing_integer = null,
-            .fields = new_viewdu_fields[0..viewdu_fixed_field_count],
-            .decls = &[_]std.builtin.Type.Declaration{},
-            .is_tuple = false,
-        },
-    });
-
-    // overwrite the above fields
     inline for (ssz_struct_info.fields, 0..) |field, i| {
         // basic types don't have specific ViewDU type
         // composite types have ViewDU type
         const viewdu_type = field.type.getViewDUType();
+
+        // with Zig 0.13, it's not possible to define getter and setter methods for fields in the same struct
+        // so for each field, we need to define an internal struct with get() and set() methods as below
         const wrapped_viewdu_type = struct {
             value: ?viewdu_type,
             parent: *BasicContainerTreeViewDU,
@@ -121,7 +95,7 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
             }
         };
 
-        new_viewdu_fields[i + viewdu_fixed_field_count] = .{
+        new_viewdu_fields[i] = .{
             .name = field.name,
             .type = *wrapped_viewdu_type,
             .default_value = null,
@@ -131,7 +105,9 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
         };
     }
 
-    const ContainerTreeViewDU = comptime @Type(.{
+    // with Zig 0.13 it's not possible to define  (declarations) from these field definitions
+    // so we need to make it as a field of an outer struct named ContainerTreeViewDU
+    const FieldsTreeViewDU = comptime @Type(.{
         .Struct = .{
             .layout = .auto,
             .backing_integer = null,
@@ -140,6 +116,16 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
             .is_tuple = false,
         },
     });
+
+    const ContainerTreeViewDU = struct {
+        // BasicContainerTreeViewDU
+        root_node: *Node,
+        nodes: []?*Node,
+        allocator: Allocator,
+        fields: FieldsTreeViewDU,
+
+        // TODO: commit(), hashTreeRoot()
+    };
 
     // this works for Zig 0.13
     // syntax in 0.14 or later could change, see https://github.com/ziglang/zig/issues/10710
@@ -207,17 +193,22 @@ pub fn createContainerType(comptime ST: type, hashFn: HashFn) type {
             }
             viewdu.allocator = arena_allocator;
             const baseViewDU: *BasicContainerTreeViewDU = @ptrCast(viewdu);
-            inline for (new_viewdu_fields, 0..) |field, i| {
+            inline for (new_viewdu_fields) |field| {
                 // this type is *wrapped_viewdu_type
-                if (i >= viewdu_fixed_field_count) {
-                    const ptr_type = field.type;
-                    const wrapped_viewdu_type = @typeInfo(ptr_type).Pointer.child;
-                    @field(viewdu, field.name) = try wrapped_viewdu_type.init(arena_allocator, baseViewDU);
-                }
+                const ptr_type = field.type;
+                const wrapped_viewdu_type = @typeInfo(ptr_type).Pointer.child;
+                @field(viewdu.fields, field.name) = try wrapped_viewdu_type.init(arena_allocator, baseViewDU);
             }
 
             return viewdu;
         }
+
+        // pub fn commitViewDU(viewdu: *ContainerTreeViewDU) *Node {
+        //     // TODO: setNodesAtDepth requires a pool, where to model it? it should be singleton across all types
+        //     // inline for all fields, implement and call commit() there, which returns ?Node
+        //     // if result is not null, set to stack allocated changed nodes along with index
+        //     // call setNodesAtDepth with changed nodes
+        // }
 
         /// to be used by parent
         /// an alignment of struct is max of all fields' alignment
@@ -589,8 +580,8 @@ test "basic ContainerType {x: uint, y:bool}" {
     const root_node = try pool.newBranch(leaf1, leaf2);
     const viewdu_result = try containerType.getViewDU(root_node);
     defer viewdu_result.deinit();
-    try expect(try viewdu_result.value.x.get() == 1);
-    try expect(try viewdu_result.value.y.get() == true);
+    try expect(try viewdu_result.value.fields.x.get() == 1);
+    try expect(try viewdu_result.value.fields.y.get() == true);
     try pool.unref(root_node);
 }
 
