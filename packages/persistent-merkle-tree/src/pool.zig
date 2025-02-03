@@ -99,6 +99,20 @@ pub const NodePool = struct {
         return node;
     }
 
+    /// New LeafNode with its internal value set to zero. Consider using `zeroNode(0)` if you don't need to mutate.
+    pub fn newZeroLeaf(self: *NodePool) !*Node {
+        const zero_hash = [_]u8{0} ** 32;
+        return self.newLeaf(&zero_hash);
+    }
+
+    /// LeafNode with 8 uint32 `(uint32, 0, 0, 0, 0, 0, 0, 0)`.
+    pub fn newUint32Leaf(self: *NodePool, value: u32) !*Node {
+        const hash = [_]u8{0} ** 32;
+        const slice = std.mem.bytesAsSlice(u32, hash[0..]);
+        slice[0] = value;
+        return self.newLeaf(&hash);
+    }
+
     /// create new branch node, if there is any in the pool, reuse it
     /// cannot make left and right as const since we may modify its ref_count
     pub fn newBranch(self: *NodePool, left: *Node, right: *Node) nm.NodeError!*Node {
